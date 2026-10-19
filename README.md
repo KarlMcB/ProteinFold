@@ -39,3 +39,4 @@ so it can be unit-tested in Node.
 
 ## Student worksheet
 `ProteinFold_Student_Worksheet.docx`: a 3-page, 9th-grade worksheet that walks students through all three tabs (data tables, short-answer questions, challenge checklist, and a bonus design task).
+`ProteinFold_Answer_Key.docx`: a 2-page teacher key with typical lab values (accept ranges, folding is random), sample answers, and how to earn each challenge.
