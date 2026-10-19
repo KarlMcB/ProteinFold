@@ -28,7 +28,7 @@ main{padding:16px}
 .lab{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(300px,1fr);gap:16px;align-items:start}
 @media(min-width:901px){.lab>div:nth-child(2){position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto;padding:2px}}
 @media(max-width:900px){.lab{grid-template-columns:1fr}.lab>div{display:contents}.lab .card{margin-top:0}#stageCard{order:1}#resultCard{order:2}#buildCard{order:3}#chCard{order:4}#whyCard{order:5}
-  #denStage{order:1}#denCond{order:2}#denStatus{order:3}#denPlot{order:4}#denCh{order:5}#denWhy{order:6}}
+  #denStage{order:1}#denPick{order:2}#denCond{order:3}#denStatus{order:4}#denPlot{order:5}#denCh{order:6}#denWhy{order:7}}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 1px 2px rgba(20,33,61,.05)}
 .card+.card{margin-top:16px}
 .card h2{margin:0 0 6px;font-size:1.1rem}
@@ -112,6 +112,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;heigh
 input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#fff;border:4px solid var(--ink);cursor:grab}
 .sl{margin-bottom:14px}.sl .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
 .sl .val{font-weight:800;font-size:1.15rem}.ticks{display:flex;justify-content:space-between;font-size:.78rem;color:var(--muted)}
+.picks{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.pick{border:2px solid var(--line);background:#fff;border-radius:12px;padding:8px 10px;cursor:pointer;text-align:left;font-weight:700;line-height:1.2}
+.pick span{display:block;font-size:1.4rem}.pick[aria-pressed="true"]{border-color:var(--accent);background:#f3edff;box-shadow:0 0 0 2px var(--accent)}
 .bar.f i{background:var(--accent)}.bar.a i{background:var(--good)}
 #cvPlot{width:100%;height:130px;display:block;border:1px solid var(--line);border-radius:10px;background:#fbfcfe}
 textarea,input[type=text]{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff}
@@ -309,6 +312,11 @@ textarea{min-height:76px;resize:vertical}
     </div>
 
     <div>
+      <div class="card" id="denPick">
+        <h2>🔬 Choose a protein</h2>
+        <div class="picks" id="picks" role="group" aria-label="Protein"></div>
+        <div id="pickInfo" class="small"></div>
+      </div>
       <div class="card" id="denCond">
         <h2>🌡️ Change the conditions</h2>
         <div class="sl">
@@ -322,7 +330,7 @@ textarea{min-height:76px;resize:vertical}
           <div class="ticks"><span>0 acid</span><span>7 neutral</span><span>14 base</span></div>
         </div>
         <div class="row">
-          <button class="btn" id="qNormal">↺ Normal (37 °C, pH 7)</button>
+          <button class="btn" id="qNormal">↺ Home conditions</button>
           <button class="btn" id="qFridge">🧊 Fridge</button>
           <button class="btn" id="qBoil">🥚 Boil</button>
           <button class="btn" id="qLemon">🍋 Lemon juice</button>
@@ -356,12 +364,12 @@ textarea{min-height:76px;resize:vertical}
 /* ==SIM-START== */
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 
-const MIN_D=0.92, MIN_D2=1.5;          // non-bonded / i,i+2 minimum distances
+const MIN_D=0.92, MIN_D2=1.5, SWELL_R=2.6;          // non-bonded / i,i+2 minimum distances
 const SIM={pull:0.05,pair:0.02,shellK:0.12,compact:0.004,shellBase:1.0,shellMul:0.8};
 
 // One overdamped-Langevin step with position constraints.
 // P: [{x,y,z}], types: 'n'|'p', env: 'water' (nonpolar clusters) | 'membrane' (polar clusters)
-function simStep(P,types,env,T,att,rand,q,es){
+function simStep(P,types,env,T,att,rand,q,es,cid,sw){
   const N=P.length, ct=env==='water'?'n':'p';
   let gx=0,gy=0,gz=0,cx=0,cy=0,cz=0,nc=0;
   for(let i=0;i<N;i++){gx+=P[i].x;gy+=P[i].y;gz+=P[i].z;if(types[i]===ct){nc++;cx+=P[i].x;cy+=P[i].y;cz+=P[i].z}}
@@ -371,6 +379,10 @@ function simStep(P,types,env,T,att,rand,q,es){
   for(let i=0;i<N;i++){
     const p=P[i],f=F[i];
     if(nc>=3){f[0]+=(gx-p.x)*SIM.compact*att;f[1]+=(gy-p.y)*SIM.compact*att;f[2]+=(gz-p.z)*SIM.compact*att}
+    if(sw>0){ // heat / extreme pH: entropy pushes the chain open to a loose coil
+      const dx=p.x-gx,dy=p.y-gy,dz=p.z-gz,r=Math.hypot(dx,dy,dz)||1e-6;
+      if(r<SWELL_R){const k=sw*.03*(SWELL_R-r)/r;f[0]+=dx*k;f[1]+=dy*k;f[2]+=dz*k}
+    }
     if(nc>=2&&types[i]===ct){
       f[0]+=(cx-p.x)*SIM.pull*att;f[1]+=(cy-p.y)*SIM.pull*att;f[2]+=(cz-p.z)*SIM.pull*att;
       for(let j=0;j<N;j++){
@@ -401,9 +413,10 @@ function simStep(P,types,env,T,att,rand,q,es){
     p.x+=f[0]+(rand()*2-1)*T;p.y+=f[1]+(rand()*2-1)*T;p.z+=f[2]+(rand()*2-1)*T;
   }
   for(let it=0;it<8;it++){
-    for(let i=0;i<N-1;i++){push(P[i],P[i+1],1.0,true)}
-    for(let i=0;i<N;i++)for(let j=i+2;j<N;j++){
-      const m=(j-i===2)?MIN_D2:MIN_D;push(P[i],P[j],m,false);
+    for(let i=0;i<N-1;i++){if(cid&&cid[i]!==cid[i+1])continue;push(P[i],P[i+1],1.0,true)}
+    for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){
+      const bonded=j-i===1&&(!cid||cid[i]===cid[j]);if(bonded)continue;
+      const m=(j-i===2&&(!cid||cid[i]===cid[j]))?MIN_D2:MIN_D;push(P[i],P[j],m,false);
     }
   }
   let mx=0,my=0,mz=0;for(const p of P){mx+=p.x;my+=p.y;mz+=p.z}mx/=N;my/=N;mz/=N;
@@ -451,9 +464,20 @@ function chargeOf(abbr,pH){
   const e=PKA[abbr];if(!e)return 0;
   return e[0]==='a'?-1/(1+Math.pow(10,e[1]-pH)):1/(1+Math.pow(10,pH-e[1]));
 }
-function conditions(temp,pH,abbrs){
-  const Dt=sig((temp-60)/3.5),Dp=sig((Math.abs(pH-7.2)-3.6)/.55);
-  return{Dt,Dp,att:(1-.92*Dt)*(1-.9*Dp),T:.002+.22*Math.pow(temp/100,2.6),q:abbrs.map(a=>chargeOf(a,pH)),es:3};
+const PROFILES=[
+  {id:'human',rgN:1.43,name:'Human enzyme',icon:'🧍',seq:'Leu Val Asp Ile Phe Lys Ala Leu Glu Val Ile Arg Phe Leu Asp Ala Val Lys Ile Glu His',homeT:37,homeP:7,tMid:60,pHopt:7.2,pHw:3.6,stab:1,tOpt:37,
+   blurb:'A typical enzyme in your body. Happiest at body temperature and neutral pH, with a balanced mix of + and − amino acids.'},
+  {id:'stomach',rgN:1.43,name:'Stomach enzyme',icon:'🍋',seq:'Leu Val Asp Ile Phe Asp Ala Leu Glu Val Ile Glu Phe Leu Asp Ala Val Asp Ile Glu Ser',homeT:37,homeP:2,tMid:60,pHopt:2,pHw:3.2,stab:1,tOpt:37,
+   blurb:'Pepsin-like: works in stomach acid (pH 2). It is packed with acidic amino acids (Asp, Glu) that lose their − charge in acid, so nothing pushes it apart there. Move it to neutral pH and they all turn −.'},
+  {id:'thermo',rgN:1.48,name:'Hot-spring microbe enzyme',icon:'♨️',seq:'Leu Val Glu Ile Phe Lys Ala Leu Glu Val Ile Arg Phe Leu Asp Ala Val Lys Ile Glu Arg',homeT:75,homeP:7,tMid:92,pHopt:7.2,pHw:3.6,stab:2,tOpt:75,
+   blurb:'From bacteria living in hot springs. Extra salt bridges between + and − amino acids hold it together at temperatures that would cook your enzymes. It barely works at body temperature.'},
+  {id:'arctic',rgN:1.41,name:'Antarctic fish enzyme',icon:'🐟',seq:'Leu Val Ser Ile Phe Lys Ala Leu Gly Val Ile Ser Phe Leu Asp Ala Val Thr Ile Gln Ser',homeT:4,homeP:7,tMid:33,pHopt:7.2,pHw:3.6,stab:.9,tOpt:5,
+   blurb:'From a fish in near-freezing water. A loose, flexible fold lets it work in the cold, but it falls apart at warm temperatures. Even body temperature is too hot.'}
+];
+function conditions(temp,pH,abbrs,pr){
+  pr=pr||PROFILES[0];
+  const Dt=sig((temp-pr.tMid)/3.5),Dp=sig((Math.abs(pH-pr.pHopt)-pr.pHw)/.55);
+  return{Dt,Dp,sw:1.2*Dt+.5*Dp,att:pr.stab*(1-.92*Dt)*(1-.9*Dp),T:.002+.22*Math.pow(temp/100,2.6),q:abbrs.map(a=>chargeOf(a,pH)),es:3};
 }
 /* ==SIM-END== */
 
@@ -482,7 +506,7 @@ class Fold{
     this.env='water';this.mode='strand';this.frames=0;this.foldLen=380;this.T0=.14;this.heat=false;
     this.yaw=.6;this.pitch=.3;this.scale=14;this.rand=mulberry32(seed||1);
     this.sel=-1;this.hover=-1;this.labels=false;this.exp=[];this.proj=[];this.tick=0;
-    this.show=null;this.stepMode=false;this.hiBond=null;this.showHalo=true;this.cond=null;this.foldQ=null;this.foldEs=1;this.q=null;this.tint=null;this.frost=0;this.glow=0;this.whiten=0;this.speed=1;this.flowT=0;this.lastTouch=0;this.onDone=null;this.onPick=null;this.silent=false;this.mx=0;this.my=0;
+    this.show=null;this.stepMode=false;this.hiBond=null;this.showHalo=true;this.cid=null;this.cond=null;this.foldQ=null;this.foldEs=1;this.q=null;this.tint=null;this.frost=0;this.glow=0;this.whiten=0;this.speed=1;this.flowT=0;this.lastTouch=0;this.onDone=null;this.onPick=null;this.silent=false;this.mx=0;this.my=0;
     this.bubbles=Array.from({length:26},(_,i)=>({x:Math.random(),y:Math.random(),r:3+Math.random()*7,v:.012+Math.random()*.02,h:i%3===0}));
     this.bind();
   }
@@ -490,7 +514,7 @@ class Fold{
   get types(){return this.res.slice(0,this.n).map(r=>r.t)}
   target(i){const N=this.res.length;return{x:(i-(N-1)/2)*.95,y:i%2?.22:-.22,z:0}}
   setAll(res){
-    this.res=res.map(r=>({...r}));this.P=this.res.map((_,i)=>this.target(i));
+    this.cid=null;this.res=res.map(r=>({...r}));this.P=this.res.map((_,i)=>this.target(i));
     this.born=this.res.map(()=>-1e9);this.mode='strand';this.exp=[];this.sel=-1;
   }
   insert(i,r){
@@ -503,6 +527,15 @@ class Fold{
   remove(i){this.P.splice(i,1);this.res.splice(i,1);this.born.splice(i,1);this.dirty()}
   retype(i,r){this.res[i]={...r};this.dirty()}
   swap(i,j){[this.res[i],this.res[j]]=[this.res[j],this.res[i]];this.dirty()}
+  addChains(k){ // spawn k extra copies of the chain, offset in space (used for aggregation)
+    const N0=this.res.length,cid=this.cid||new Array(N0).fill(0),src=this.P.slice(0,N0).map(p=>({...p})),rs=this.res.slice(0,N0);
+    for(let c=1;c<=k;c++){
+      const a=c/k*Math.PI*2,ox=Math.cos(a)*4,oy=(c%2?1:-1)*2,oz=Math.sin(a)*4;
+      for(let i=0;i<N0;i++){this.P.push({x:src[i].x+ox+(this.rand()-.5)*.6,y:src[i].y+oy+(this.rand()-.5)*.6,z:src[i].z+oz+(this.rand()-.5)*.6});
+        this.res.push({...rs[i]});this.born.push(performance.now());cid.push(c)}
+    }
+    this.cid=cid;
+  }
   setEnv(e){this.env=e;this.dirty()}
   dirty(){
     if(this.res.length<4){this.mode='strand';return}
@@ -524,12 +557,12 @@ class Fold{
     if(this.mode==='strand'){
       for(let i=0;i<NA;i++){const t=this.target(i),p=this.P[i];p.x+=(t.x-p.x)*.1;p.y+=(t.y-p.y)*.1;p.z+=(t.z-p.z)*.1}
     }else{
-      let T,att=1,q=this.foldQ,es=this.foldEs;
+      let T,att=1,q=this.foldQ,es=this.foldEs,sw=0;
       if(this.heat){T=.2;att=.12}
       else if(this.mode==='folding'){const t=Math.min(1,this.frames/this.foldLen);T=this.T0*Math.pow(.08,t)+.006;this.frames++}
       else T=.008;
-      if(this.cond&&this.mode==='folded'&&!this.heat){T=this.cond.T;att=this.cond.att;q=this.cond.q;es=this.cond.es}
-      simStep(this.P.slice(0,N),this.types,this.env,T,att,this.rand,q,es);
+      if(this.cond&&this.mode==='folded'&&!this.heat){T=this.cond.T;att=this.cond.att;q=this.cond.q;es=this.cond.es;sw=this.cond.sw||0}
+      simStep(this.P.slice(0,N),this.types,this.env,T,att,this.rand,q,es,this.cid,sw);
       if(this.P.slice(0,N).some(q=>!isFinite(q.x+q.y+q.z)))for(let i=0;i<N;i++)this.P[i]=this.target(i);
       if(this.mode==='folding'&&this.frames>=this.foldLen){this.mode='folded';this.exp=exposures(this.P.slice(0,N));if(this.onDone)this.onDone(this)}
     }
@@ -575,7 +608,7 @@ class Fold{
     const ct=this.env==='water'?'n':'p',showWarn=this.showHalo&&this.mode==='folded'&&!this.heat&&this.exp.length===N&&this.res.slice(0,N).filter(r=>r.t===ct).length>=3;
     const items=[];
     const pr=R.map((r,i)=>{const s=D/(D-r.z);return{x:w/2+r.x*sc*s,y:h*.5-r.y*sc*s,s,z:r.z,i}});
-    for(let i=0;i<N-1;i++)items.push({z:(R[i].z+R[i+1].z)/2-.01,bond:[pr[i],pr[i+1]],idx:i});
+    for(let i=0;i<N-1;i++){if(this.cid&&this.cid[i]!==this.cid[i+1])continue;items.push({z:(R[i].z+R[i+1].z)/2-.01,bond:[pr[i],pr[i+1]],idx:i})}
     for(let i=0;i<N;i++)items.push({z:R[i].z,bead:pr[i]});
     items.sort((a,b)=>a.z-b.z);
     const bg=this.env==='water'?'207,234,251':'246,223,174';
@@ -997,18 +1030,23 @@ $('msAuto').onclick=()=>{
 FA.onDone=mDone;FB.onDone=mDone;
 
 /* ============ DENATURE LAB ============ */
-const DEN_SEQ='Leu Val Asp Ile Phe Lys Ala Leu Glu Val Ile Arg Phe Leu Asp Ala Val Lys Ile Glu His'.split(' ').map(fromAbbr);
-const DEN_ABBR=DEN_SEQ.map(r=>r.abbr);
+let DEN_PROF=PROFILES[0],DEN_SEQ=[],DEN_ABBR=[];
+function setProfile(i){DEN_PROF=PROFILES[i];DEN_ABBR=DEN_PROF.seq.split(' ');DEN_SEQ=DEN_ABBR.map(fromAbbr)}
+setProfile(0);
 const F3=new Fold($('cvD'),23);F3.showHalo=false;folds.push(F3);
-const RG_NATIVE=1.43,RG_UNFOLDED=2.2;
-const DN={temp:37,pH:7,ff:1,act:1,ready:false,started:false,cooked:false,cookTicks:0,wasDen:false,done:{},sust:{},hist:[],cond:null};
+const RG_UNFOLDED=2.2;
+const DN={visited:new Set(['human']),temp:37,pH:7,ff:1,act:1,ready:false,started:false,cooked:false,cookTicks:0,wasDen:false,done:{},sust:{},hist:[],cond:null};
 const DN_CH=[
   {id:'heat',t:'Heat wave',d:'Unfold the protein with temperature alone (keep pH near 7).'},
   {id:'acid',t:'Acid attack',d:'Denature it with acid: pH 2 or lower, at body temperature or cooler.'},
   {id:'base',t:'Base attack',d:'Denature it with a base: pH 12.5 or higher, at body temperature or cooler.'},
   {id:'cold',t:'Chill out',d:'Cool it to 6 °C or less and hold. Is the shape damaged? Is it working?'},
   {id:'cook',t:'Point of no return',d:'Boil it long enough that the proteins clump and cooling cannot undo it (like an egg white).'},
-  {id:'back',t:'Bring it back',d:'Denature the protein, then return to normal conditions so it refolds.'}
+  {id:'back',t:'Bring it back',d:'Denature the protein, then return it to its home conditions so it refolds.'},
+  {id:'hot',t:'Hot-spring survivor',d:'Pick the hot-spring microbe enzyme and keep it folded at 85 °C or hotter.'},
+  {id:'stom',t:'Stomach meets intestine',d:'Pick the stomach enzyme and denature it by raising the pH to 6 or higher.'},
+  {id:'fish',t:'Too warm for a fish',d:'Pick the Antarctic fish enzyme and denature it at 40 °C or hotter.'},
+  {id:'tour',t:'Meet them all',d:'Try all four proteins.'}
 ];
 function renderDnCh(){
   $('dnChallenges').innerHTML=DN_CH.map(c=>`<div class="ch ${DN.done[c.id]?'done':''}"><div class="tick">${DN.done[c.id]?'✓':''}</div><div><b>${c.t}</b><span class="muted small">${c.d}</span></div></div>`).join('')
@@ -1026,8 +1064,8 @@ const phWord=p=>p<3?'strongly acidic':p<6.5?'acidic':p<=7.5?'neutral':p<11?'basi
 const tWord=t=>t<=6?'cold':t<30?'cool':t<=40?'body temperature':t<60?'hot':t<95?'very hot':'boiling';
 
 function dnApply(){
-  const c=conditions(DN.temp,DN.pH,DEN_ABBR);
-  if(DN.cooked)c.att=Math.min(c.att,.06);
+  const c=conditions(DN.temp,DN.pH,DEN_ABBR,DEN_PROF);
+  if(DN.cooked){c.att=.55;c.sw=0;c.q=c.q.concat(c.q,c.q,c.q)}   // clumped: sticky unfolded copies
   DN.cond=c;
   F3.q=c.q;
   const [r,g,b]=phRGB(DN.pH),dev=Math.min(1,Math.abs(DN.pH-7)/5);
@@ -1035,14 +1073,14 @@ function dnApply(){
   F3.frost=Math.max(0,Math.min(1,(14-DN.temp)/14))*.4;
   F3.glow=Math.max(0,Math.min(1,(DN.temp-45)/55))*.5;
   F3.speed=Math.max(.12,DN.temp/37);
-  if(DN.ready)F3.cond={T:c.T,att:c.att,q:c.q,es:c.es};
+  if(DN.ready)F3.cond={T:c.T,att:c.att,q:c.q,es:c.es,sw:c.sw};
   $('tempV').textContent=`${DN.temp} °C · ${tWord(DN.temp)}`;
   $('phV').textContent=`${DN.pH.toFixed(1)} · ${phWord(DN.pH)}`;
 }
 function setConditions(t,p){$('tempR').value=t;$('phR').value=p;DN.temp=+t;DN.pH=+p;dnApply()}
 $('tempR').oninput=e=>{DN.temp=+e.target.value;dnApply()};
 $('phR').oninput=e=>{DN.pH=+e.target.value;dnApply()};
-$('qNormal').onclick=()=>setConditions(37,7);
+$('qNormal').onclick=()=>setConditions(DEN_PROF.homeT,DEN_PROF.homeP);
 $('qFridge').onclick=()=>setConditions(4,7);
 $('qBoil').onclick=()=>setConditions(100,7);
 $('qLemon').onclick=()=>setConditions(37,2);
@@ -1052,56 +1090,73 @@ $('dnLbl').onchange=e=>{F3.labels=e.target.checked};
 function dnReset(){
   DN.ready=false;DN.cooked=false;DN.cookTicks=0;DN.wasDen=false;DN.sust={};DN.hist=[];DN.ff=1;
   F3.cond=null;F3.whiten=0;F3.setAll(DEN_SEQ);
-  const c0=conditions(37,7,DEN_ABBR);F3.foldQ=c0.q;F3.foldEs=c0.es;F3.q=c0.q;
-  setConditions(37,7);
+  const c0=conditions(DEN_PROF.homeT,DEN_PROF.homeP,DEN_ABBR,DEN_PROF);F3.foldQ=c0.q;F3.foldEs=c0.es;F3.q=c0.q;
+  setConditions(DEN_PROF.homeT,DEN_PROF.homeP);
   $('dStatus').className='muted';$('dStatus').textContent='Folding the starting protein…';
   F3.begin(.14,380,true);
 }
 F3.onDone=()=>{DN.ready=true;dnApply()};
 $('dnReset').onclick=dnReset;
-function dnStart(){if(DN.started)return;DN.started=true;renderDnCh();dnReset()}
+function renderPicks(){
+  $('picks').innerHTML=PROFILES.map((p,i)=>`<button class="pick" data-i="${i}" aria-pressed="${p===DEN_PROF}"><span>${p.icon}</span>${p.name}</button>`).join('');
+  $('pickInfo').innerHTML=`<p style="margin:4px 0">${DEN_PROF.blurb}</p><p class="muted" style="margin:4px 0"><b>Home conditions:</b> ${DEN_PROF.homeT} °C, pH ${DEN_PROF.homeP}</p>`;
+}
+$('picks').addEventListener('click',e=>{
+  const b=e.target.closest('.pick');if(!b)return;
+  setProfile(+b.dataset.i);DN.visited.add(DEN_PROF.id);renderPicks();dnReset();
+});
+function dnStart(){if(DN.started)return;DN.started=true;renderDnCh();renderPicks();dnReset()}
 
 function dnRg(){const P=F3.P;let r=0;for(const p of P)r+=p.x*p.x+p.y*p.y+p.z*p.z;return Math.sqrt(r/P.length)}
 function dnTick(){
   if(!DN.started||!F3.cv.offsetParent)return;
   if(!DN.ready){return}
-  const target=Math.max(0,Math.min(1,(RG_UNFOLDED-dnRg())/(RG_UNFOLDED-RG_NATIVE)));
+  const target=DN.cooked?0:Math.max(0,Math.min(1,(RG_UNFOLDED-dnRg())/(RG_UNFOLDED-DEN_PROF.rgN)));
   DN.ff+=(target-DN.ff)*.25;
-  const ff=DN.ff,rate=DN.temp<37?Math.pow(2,(DN.temp-37)/10):1;
+  const ff=DN.ff,rate=DN.temp<DEN_PROF.tOpt?Math.pow(2,(DN.temp-DEN_PROF.tOpt)/10):1;
   DN.act=ff*ff*rate;
   // cooked: held very hot and unfolded
   if(DN.temp>=72&&ff<.35)DN.cookTicks++;else DN.cookTicks=Math.max(0,DN.cookTicks-1);
-  if(!DN.cooked&&DN.cookTicks>=22){DN.cooked=true;dnApply();toast('🥚 The proteins clumped together. This can\'t be undone by cooling.')}
+  if(!DN.cooked&&DN.cookTicks>=22){DN.cooked=true;F3.addChains(3);dnApply();toast('🥚 The proteins clumped together. This can\'t be undone by cooling.')}
   F3.whiten+=((DN.cooked?1:0)-F3.whiten)*.08;
   if(ff<.3&&!DN.cooked)DN.wasDen=true;
   // meters
   $('dFold').style.width=ff*100+'%';$('dFoldT').textContent=Math.round(ff*100)+'%';
   const act=Math.min(1,DN.act);$('dAct').style.width=act*100+'%';$('dActT').textContent=Math.round(act*100)+'%';
-  const net=DN.cond.q.reduce((a,b)=>a+b,0),pos=DN.cond.q.filter(v=>v>.5).length,neg=DN.cond.q.filter(v=>v<-.5).length;
+  const q1=DN.cond.q.slice(0,DEN_ABBR.length),net=q1.reduce((a,b)=>a+b,0),pos=q1.filter(v=>v>.5).length,neg=q1.filter(v=>v<-.5).length;
   $('dCharge').textContent=`Charged amino acids: ${pos} (+), ${neg} (−) · net charge ${net>0?'+':''}${net.toFixed(1)}`;
   // status
   const c=DN.cond;let head,cls;
-  if(DN.cooked){head='🥚 <b>Clumped.</b> The unfolded proteins stuck to each other, like an egg white turning solid white. Cooling can\'t reverse this.';cls='bad'}
-  else if(ff>=.85){head=DN.temp<=10?'🧊 <b>Chilled but intact.</b> The shape is fine; molecules just move slowly, so the enzyme works slowly. Warm it up and it speeds up again.':'✅ <b>Native shape.</b> Folded and working.';cls='good'}
+  if(DN.cooked){head='🥚 <b>Clumped.</b> The unfolded proteins exposed their oily parts and stuck to each other in one tangled mass, like an egg white turning solid white. Cooling can\'t reverse this.';cls='bad'}
+  else if(ff>=.85){head=DN.temp<=10&&DEN_PROF.id!=='arctic'?'🧊 <b>Chilled but intact.</b> The shape is fine; molecules just move slowly, so the enzyme works slowly. Warm it up and it speeds up again.':'✅ <b>Native shape.</b> Folded and working.';cls='good'}
   else if(ff>=.5){head='⚠️ <b>Starting to unfold.</b> The core is loosening and the active shape is changing.';cls='info'}
   else if(ff>=.2){head='❌ <b>Mostly unfolded.</b> Very little of the original shape is left.';cls='bad'}
   else{head='❌ <b>Denatured.</b> No folded shape, so no function.';cls='bad'}
   const why=[];
   if(c.Dt>.12)why.push('🔥 <b>Heat:</b> faster-moving molecules shake the weak bonds apart, so the oily core and hydrogen bonds let go.');
-  if(c.Dp>.12||Math.abs(DN.pH-7)>2.2)why.push(DN.pH<7?`🍋 <b>Acid (pH ${DN.pH.toFixed(1)}):</b> extra H⁺ ions stick to the amino acids. The − charges disappear, almost everything becomes +, salt bridges vanish and like charges push apart.`:`🧼 <b>Base (pH ${DN.pH.toFixed(1)}):</b> extra OH⁻ ions pull H⁺ off the amino acids. The + charges disappear, almost everything becomes −, salt bridges vanish and like charges push apart.`);
-  if(!why.length&&DN.temp>10)why.push('🧂 At normal temperature and pH, the + and − charged amino acids pair up as <b>salt bridges</b> that help hold the fold.');
+  if(c.Dp>.12){
+    const low=DN.pH<DEN_PROF.pHopt;
+    const same=(pos>0)!==(neg>0);
+    why.push(`${low?'🍋':'🧼'} <b>pH ${DN.pH.toFixed(1)} is far from this protein's happy range:</b> ${low?'more H⁺ ions around, so amino acids pick up H⁺':'fewer H⁺ ions around, so amino acids give up H⁺'}. The chain now has ${pos} (+) and ${neg} (−) charges${same?', all the same sign, so they push each other apart':', so the salt bridges that held it together break and like charges repel'}.`);
+  }
+  if(!why.length&&DN.temp>10)why.push(DEN_PROF.id==='stomach'?'🍋 In acid, this protein\'s acidic amino acids (Asp, Glu) are neutral, so no − charges push it apart. It is built for the stomach.':'🧂 At its home conditions the + and − charged amino acids pair up as <b>salt bridges</b> that help hold the fold.');
   if(DN.temp<=10)why.push('🧊 <b>Cold:</b> slower molecules, but cold does not unfold proteins.');
   $('dStatus').className='';$('dStatus').innerHTML=`<div class="callout ${cls}">${head}</div>${why.map(w=>`<p class="small" style="margin:8px 0 0">${w}</p>`).join('')}`;
   // history + chart
   DN.hist.push([ff,Math.min(1,DN.act)]);if(DN.hist.length>400)DN.hist.shift();drawPlot();
   // challenges
   const sus=(k,cond)=>{DN.sust[k]=cond?(DN.sust[k]||0)+1:0;if(DN.sust[k]>=14)completeDn(k)};
-  sus('heat',DN.temp>=50&&Math.abs(DN.pH-7)<1.5&&ff<.6);
-  sus('acid',DN.pH<=2&&DN.temp<=40&&ff<.6);
-  sus('base',DN.pH>=12.5&&DN.temp<=40&&ff<.6);
+  const hT=DEN_PROF.homeT,hP=DEN_PROF.homeP,id=DEN_PROF.id;
+  sus('heat',DN.temp>=hT+12&&Math.abs(DN.pH-hP)<1.5&&ff<.6);
+  sus('acid',DN.pH<=2&&DN.temp<=hT+3&&ff<.6);
+  sus('base',DN.pH>=12.5&&DN.temp<=hT+3&&ff<.6);
   sus('cold',DN.temp<=6&&ff>.85&&DN.act<.3);
   sus('cook',DN.cooked);
-  sus('back',DN.wasDen&&!DN.cooked&&DN.temp<=45&&DN.pH>=6&&DN.pH<=8.5&&ff>=.85);
+  sus('back',DN.wasDen&&!DN.cooked&&Math.abs(DN.temp-hT)<=8&&Math.abs(DN.pH-hP)<=1.5&&ff>=.85);
+  sus('hot',id==='thermo'&&DN.temp>=85&&ff>=.8);
+  sus('stom',id==='stomach'&&DN.pH>=6&&ff<.6);
+  sus('fish',id==='arctic'&&DN.temp>=40&&ff<.6);
+  if(DN.visited.size>=PROFILES.length)completeDn('tour');
 }
 function drawPlot(){
   const cv=$('cvPlot'),dpr=Math.min(2,window.devicePixelRatio||1),w=cv.clientWidth,h=cv.clientHeight;if(!w||!h)return;
@@ -1132,7 +1187,7 @@ for(const ch of'NPNNPNNPNN')L.seq.push(mk(ch==='N'?'n':'p'));
 F1.setAll(L.seq);renderChips();renderCh();mReset();setEnv('water');
 $('hudMsg').textContent='Drag to rotate · tap a bead to select';
 requestAnimationFrame(loop);
-window.__PF={F1,FA,FB,F3,L,M,DN};
+window.__PF={F1,FA,FB,F3,L,M,DN,PROFILES};
 </script>
 </body>
 </html>
