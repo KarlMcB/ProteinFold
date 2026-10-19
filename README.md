@@ -40,3 +40,6 @@ so it can be unit-tested in Node.
 ## Student worksheet
 `ProteinFold_Student_Worksheet.docx`: a 3-page, 9th-grade worksheet that walks students through all three tabs (data tables, short-answer questions, challenge checklist, and a bonus design task).
 `ProteinFold_Answer_Key.docx`: a 2-page teacher key with typical lab values (accept ranges, folding is random), sample answers, and how to earn each challenge.
+
+### 30-minute, black-and-white versions
+`ProteinFold_Student_Worksheet_30min_BW.docx` and `ProteinFold_Answer_Key_30min_BW.docx`: 2 pages each, grayscale design for B&W printing (dark/light grays, heavy borders, grayscale screenshots). Cuts from the full version: fewer table rows, one mutation run, no four-protein table, challenge checklist or bonus.
