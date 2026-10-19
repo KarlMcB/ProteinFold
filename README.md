@@ -17,7 +17,12 @@ from polar and nonpolar amino acids and watch it fold in 3D.
 **Step by step** starts empty. **Forward ▶** adds the next amino acid (the new peptide bond flashes and the
 chain folds around it); **◀ Back** removes the last one. Also Auto-play, Restart, and arrow-key control.
 
-Six challenges (hide the oily parts, fully buried, inside-out membrane protein, sticky patch,
+3. **Denature Lab**: a small protein with charged amino acids (+/−). Temperature and pH sliders unfold it:
+   heat shakes the weak bonds loose, acid/base change which amino acids are charged so salt bridges vanish and
+   like charges repel, and cold only slows it. Live meters for folded shape and enzyme activity, a time chart,
+   six challenges (including a point of no return where boiled proteins clump like egg white).
+
+The Build & Fold tab has six challenges (hide the oily parts, fully buried, inside-out membrane protein, sticky patch,
 zipper test, sticky-swap detective) give students goals.
 
 ## Science notes

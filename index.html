@@ -27,7 +27,8 @@ main{padding:16px}
 .tab{display:none}.tab.on{display:block}
 .lab{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(300px,1fr);gap:16px;align-items:start}
 @media(min-width:901px){.lab>div:nth-child(2){position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto;padding:2px}}
-@media(max-width:900px){.lab{grid-template-columns:1fr}.lab>div{display:contents}.lab .card{margin-top:0}#stageCard{order:1}#resultCard{order:2}#buildCard{order:3}#chCard{order:4}#whyCard{order:5}}
+@media(max-width:900px){.lab{grid-template-columns:1fr}.lab>div{display:contents}.lab .card{margin-top:0}#stageCard{order:1}#resultCard{order:2}#buildCard{order:3}#chCard{order:4}#whyCard{order:5}
+  #denStage{order:1}#denCond{order:2}#denStatus{order:3}#denPlot{order:4}#denCh{order:5}#denWhy{order:6}}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 1px 2px rgba(20,33,61,.05)}
 .card+.card{margin-top:16px}
 .card h2{margin:0 0 6px;font-size:1.1rem}
@@ -106,6 +107,13 @@ table{border-collapse:collapse;width:100%;font-size:.92rem}
 th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
 th{background:#eef2fa}
 .seqs{font-family:ui-monospace,Menlo,Consolas,monospace;letter-spacing:1px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:12px;border-radius:99px;background:var(--g,#ccd);outline-offset:6px;margin:10px 0 2px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;border-radius:50%;background:#fff;border:4px solid var(--ink);cursor:grab}
+input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#fff;border:4px solid var(--ink);cursor:grab}
+.sl{margin-bottom:14px}.sl .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.sl .val{font-weight:800;font-size:1.15rem}.ticks{display:flex;justify-content:space-between;font-size:.78rem;color:var(--muted)}
+.bar.f i{background:var(--accent)}.bar.a i{background:var(--good)}
+#cvPlot{width:100%;height:130px;display:block;border:1px solid var(--line);border-radius:10px;background:#fbfcfe}
 textarea,input[type=text]{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff}
 textarea{min-height:76px;resize:vertical}
 .toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,40px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;opacity:0;transition:all .3s;z-index:20;max-width:92vw;text-align:center}
@@ -124,6 +132,7 @@ textarea{min-height:76px;resize:vertical}
     <nav role="tablist" aria-label="Sections">
       <button role="tab" aria-selected="true"  data-tab="lab">1 · Build &amp; Fold</button>
       <button role="tab" aria-selected="false" data-tab="mut">2 · Mutation Lab</button>
+      <button role="tab" aria-selected="false" data-tab="den">3 · Denature Lab</button>
     </nav>
   </div>
 </header>
@@ -270,6 +279,73 @@ textarea{min-height:76px;resize:vertical}
   </div>
 </section>
 
+<!-- ================= TAB 3 ================= -->
+<section class="tab" id="tab-den">
+  <div class="lab">
+    <div>
+      <div class="card" id="denStage">
+        <div class="hud top">
+          <span class="pill small" id="denMsg">Drag to rotate · + and − badges show charged amino acids</span>
+          <span class="spacer"></span>
+          <label class="pill"><input type="checkbox" id="dnLbl"> Show names</label>
+        </div>
+        <div class="stage"><canvas id="cvD" aria-label="3D model of a folded protein that changes shape with temperature and pH. Drag to rotate."></canvas></div>
+        <div class="hud bottom"><button class="btn" id="dnReset">↺ New protein (reset)</button></div>
+        <div class="meters" aria-live="polite">
+          <div class="meter"><span>Folded shape</span><div class="bar f"><i id="dFold"></i></div><b id="dFoldT">–</b></div>
+          <div class="meter"><span>Enzyme activity</span><div class="bar a"><i id="dAct"></i></div><b id="dActT">–</b></div>
+          <div class="small muted" id="dCharge" style="margin-top:2px"></div>
+        </div>
+      </div>
+      <div class="card" id="denStatus">
+        <h2>What's happening?</h2>
+        <div id="dStatus" class="muted">Folding the starting protein…</div>
+      </div>
+      <div class="card" id="denPlot">
+        <h2>Shape and activity over time</h2>
+        <canvas id="cvPlot" aria-label="Line chart of folded shape and enzyme activity over the last minute"></canvas>
+        <div class="legend small" style="margin-top:6px"><span><i class="dot" style="background:var(--accent)"></i>Folded shape</span><span><i class="dot" style="background:var(--good)"></i>Enzyme activity</span></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card" id="denCond">
+        <h2>🌡️ Change the conditions</h2>
+        <div class="sl">
+          <div class="top"><label for="tempR"><b>Temperature</b></label><span class="val" id="tempV">37 °C</span></div>
+          <input type="range" id="tempR" min="0" max="100" step="1" value="37" style="--g:linear-gradient(90deg,#60a5fa,#fde047 40%,#fb923c 70%,#dc2626)">
+          <div class="ticks"><span>0 freezing</span><span>37 body</span><span>100 boiling</span></div>
+        </div>
+        <div class="sl">
+          <div class="top"><label for="phR"><b>pH</b></label><span class="val" id="phV">7.0</span></div>
+          <input type="range" id="phR" min="0" max="14" step="0.1" value="7" style="--g:linear-gradient(90deg,#e11d48,#f97316 22%,#facc15 38%,#4ade80 50%,#38bdf8 64%,#6366f1 80%,#a21caf)">
+          <div class="ticks"><span>0 acid</span><span>7 neutral</span><span>14 base</span></div>
+        </div>
+        <div class="row">
+          <button class="btn" id="qNormal">↺ Normal (37 °C, pH 7)</button>
+          <button class="btn" id="qFridge">🧊 Fridge</button>
+          <button class="btn" id="qBoil">🥚 Boil</button>
+          <button class="btn" id="qLemon">🍋 Lemon juice</button>
+          <button class="btn" id="qCleaner">🧼 Cleaner</button>
+        </div>
+      </div>
+      <div class="card" id="denCh">
+        <h2>🏆 Denaturing challenges</h2>
+        <div id="dnChallenges"></div>
+      </div>
+      <div class="card" id="denWhy">
+        <details>
+          <summary>Why does a protein denature?</summary>
+          <p>A protein's shape is held together by weak bonds: the oily core, hydrogen bonds, and <b>salt bridges</b> between + and − charged amino acids.</p>
+          <p><b>Heat</b> makes molecules move faster until they shake those weak bonds apart. <b>pH</b> changes how many H⁺ ions are around: acids add H⁺ (− charges disappear), bases remove H⁺ (+ charges disappear). Then the salt bridges vanish and like charges repel.</p>
+          <p><b>Cold</b> slows molecules down but doesn't unfold the protein.</p>
+          <p class="muted small"><b>Model limits:</b> one small protein with simple rules. Real denaturation also depends on the protein: some survive boiling, and some refold when conditions return to normal.</p>
+        </details>
+      </div>
+    </div>
+  </div>
+</section>
+
 </main>
 
 <div class="toast" id="toast" role="status"></div>
@@ -285,7 +361,7 @@ const SIM={pull:0.05,pair:0.02,shellK:0.12,compact:0.004,shellBase:1.0,shellMul:
 
 // One overdamped-Langevin step with position constraints.
 // P: [{x,y,z}], types: 'n'|'p', env: 'water' (nonpolar clusters) | 'membrane' (polar clusters)
-function simStep(P,types,env,T,att,rand){
+function simStep(P,types,env,T,att,rand,q,es){
   const N=P.length, ct=env==='water'?'n':'p';
   let gx=0,gy=0,gz=0,cx=0,cy=0,cz=0,nc=0;
   for(let i=0;i<N;i++){gx+=P[i].x;gy+=P[i].y;gz+=P[i].z;if(types[i]===ct){nc++;cx+=P[i].x;cy+=P[i].y;cz+=P[i].z}}
@@ -305,6 +381,19 @@ function simStep(P,types,env,T,att,rand){
     }else if(nc>=3&&types[i]!==ct){
       const dx=p.x-cx,dy=p.y-cy,dz=p.z-cz,d=Math.hypot(dx,dy,dz)||1e-6;
       if(d<shellR){const k=(shellR-d)*SIM.shellK*att/d;f[0]+=dx*k;f[1]+=dy*k;f[2]+=dz*k}
+    }
+  }
+  if(q){
+    for(let i=0;i<N;i++){if(!q[i])continue;
+      for(let j=i+1;j<N;j++){
+        const dq=q[i]*q[j];if(Math.abs(dq)<.05)continue;
+        const dx=P[j].x-P[i].x,dy=P[j].y-P[i].y,dz=P[j].z-P[i].z,d=Math.hypot(dx,dy,dz)||1e-6;
+        if(d>4.5)continue;
+        let k=0;
+        if(dq>0)k=-es*dq*.05/Math.max(d,.8)/d;                 // like charges repel
+        else if(d>1.2&&d<3.6)k=es*(-dq)*.03/d/d;               // opposite charges form salt bridges
+        F[i][0]+=dx*k;F[i][1]+=dy*k;F[i][2]+=dz*k;F[j][0]-=dx*k;F[j][1]-=dy*k;F[j][2]-=dz*k;
+      }
     }
   }
   for(let i=0;i<N;i++){
@@ -354,6 +443,18 @@ function summarize(types,exp,env){
   }
   return{len:types.length,nNp:nN,nP:nP,expNp:nN?sN/nN:null,expP:nP?sP/nP:null,minNp:nN?minNp:1,mism:nCt>=3?mism:0,nCt,env};
 }
+
+// Temperature / pH -> simulation parameters for the Denature Lab.
+const sig=x=>1/(1+Math.exp(-x));
+const PKA={Asp:['a',3.9],Glu:['a',4.3],His:['b',6.0],Lys:['b',10.5],Arg:['b',12.5]};
+function chargeOf(abbr,pH){
+  const e=PKA[abbr];if(!e)return 0;
+  return e[0]==='a'?-1/(1+Math.pow(10,e[1]-pH)):1/(1+Math.pow(10,pH-e[1]));
+}
+function conditions(temp,pH,abbrs){
+  const Dt=sig((temp-60)/3.5),Dp=sig((Math.abs(pH-7.2)-3.6)/.55);
+  return{Dt,Dp,att:(1-.92*Dt)*(1-.9*Dp),T:.002+.22*Math.pow(temp/100,2.6),q:abbrs.map(a=>chargeOf(a,pH)),es:3};
+}
 /* ==SIM-END== */
 
 /* ---------- amino acid data ---------- */
@@ -381,7 +482,7 @@ class Fold{
     this.env='water';this.mode='strand';this.frames=0;this.foldLen=380;this.T0=.14;this.heat=false;
     this.yaw=.6;this.pitch=.3;this.scale=14;this.rand=mulberry32(seed||1);
     this.sel=-1;this.hover=-1;this.labels=false;this.exp=[];this.proj=[];this.tick=0;
-    this.show=null;this.stepMode=false;this.hiBond=null;this.lastTouch=0;this.onDone=null;this.onPick=null;this.silent=false;this.mx=0;this.my=0;
+    this.show=null;this.stepMode=false;this.hiBond=null;this.showHalo=true;this.cond=null;this.foldQ=null;this.foldEs=1;this.q=null;this.tint=null;this.frost=0;this.glow=0;this.whiten=0;this.speed=1;this.flowT=0;this.lastTouch=0;this.onDone=null;this.onPick=null;this.silent=false;this.mx=0;this.my=0;
     this.bubbles=Array.from({length:26},(_,i)=>({x:Math.random(),y:Math.random(),r:3+Math.random()*7,v:.012+Math.random()*.02,h:i%3===0}));
     this.bind();
   }
@@ -423,11 +524,12 @@ class Fold{
     if(this.mode==='strand'){
       for(let i=0;i<NA;i++){const t=this.target(i),p=this.P[i];p.x+=(t.x-p.x)*.1;p.y+=(t.y-p.y)*.1;p.z+=(t.z-p.z)*.1}
     }else{
-      let T,att=1;
+      let T,att=1,q=this.foldQ,es=this.foldEs;
       if(this.heat){T=.2;att=.12}
       else if(this.mode==='folding'){const t=Math.min(1,this.frames/this.foldLen);T=this.T0*Math.pow(.08,t)+.006;this.frames++}
       else T=.008;
-      simStep(this.P.slice(0,N),this.types,this.env,T,att,this.rand);
+      if(this.cond&&this.mode==='folded'&&!this.heat){T=this.cond.T;att=this.cond.att;q=this.cond.q;es=this.cond.es}
+      simStep(this.P.slice(0,N),this.types,this.env,T,att,this.rand,q,es);
       if(this.P.slice(0,N).some(q=>!isFinite(q.x+q.y+q.z)))for(let i=0;i<N;i++)this.P[i]=this.target(i);
       if(this.mode==='folding'&&this.frames>=this.foldLen){this.mode='folded';this.exp=exposures(this.P.slice(0,N));if(this.onDone)this.onDone(this)}
     }
@@ -460,6 +562,9 @@ class Fold{
     if(cv.width!==Math.round(w*dpr)||cv.height!==Math.round(h*dpr)){cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr)}
     const c=this.cx;c.setTransform(dpr,0,0,dpr,0,0);
     this.background(c,w,h,now);
+    if(this.tint){c.fillStyle=this.tint;c.fillRect(0,0,w,h)}
+    if(this.frost>0){c.fillStyle=`rgba(214,236,255,${this.frost})`;c.fillRect(0,0,w,h)}
+    if(this.glow>0){const g=c.createLinearGradient(0,h,0,h*.35);g.addColorStop(0,`rgba(239,68,68,${this.glow})`);g.addColorStop(1,'rgba(239,68,68,0)');c.fillStyle=g;c.fillRect(0,0,w,h)}
     const N=this.n;this.proj=[];if(!N){return}
     const cy=Math.cos(this.yaw),sy=Math.sin(this.yaw),cp=Math.cos(this.pitch),sp=Math.sin(this.pitch);
     const PV=this.P.slice(0,N);let gx=0,gy=0,gz=0;for(const p of PV){gx+=p.x;gy+=p.y;gz+=p.z}gx/=N;gy/=N;gz/=N;
@@ -467,7 +572,7 @@ class Fold{
     let mX=1,mY=1,mR=1;for(const r of R){mX=Math.max(mX,Math.abs(r.x)+.7);mY=Math.max(mY,Math.abs(r.y)+.7);mR=Math.max(mR,Math.hypot(r.x,r.y,r.z))}
     const tgt=Math.min(w*.46/mX,h*.44/mY,70);this.scale+=(tgt-this.scale)*.08;
     const D=Math.max(18,mR*2.6+8),sc=this.scale;
-    const ct=this.env==='water'?'n':'p',showWarn=this.mode==='folded'&&!this.heat&&this.exp.length===N&&this.res.slice(0,N).filter(r=>r.t===ct).length>=3;
+    const ct=this.env==='water'?'n':'p',showWarn=this.showHalo&&this.mode==='folded'&&!this.heat&&this.exp.length===N&&this.res.slice(0,N).filter(r=>r.t===ct).length>=3;
     const items=[];
     const pr=R.map((r,i)=>{const s=D/(D-r.z);return{x:w/2+r.x*sc*s,y:h*.5-r.y*sc*s,s,z:r.z,i}});
     for(let i=0;i<N-1;i++)items.push({z:(R[i].z+R[i+1].z)/2-.01,bond:[pr[i],pr[i+1]],idx:i});
@@ -479,7 +584,7 @@ class Fold{
         const hb=this.hiBond&&this.hiBond.i===it.idx&&now-this.hiBond.t<4500;
         if(hb){const pu=.5+.5*Math.sin(now/130);c.save();c.shadowColor='#facc15';c.shadowBlur=14+8*pu;c.strokeStyle='#facc15';c.lineWidth=bw*2.2;
           c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();c.restore()}
-        c.strokeStyle=hb?'#a16207':'#5b6b86';c.lineWidth=bw;
+        c.strokeStyle=hb?'#a16207':this.whiten>.3?'#cbd5e1':'#5b6b86';c.lineWidth=bw;
         c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();continue}
       const q=it.bead,i=q.i,res=this.res[i];
       const age=(now-this.born[i])/380;let k=1;if(age<1){const t=Math.max(0,age)-1;k=Math.max(0,1+2.7*t*t*t+1.7*t*t)}
@@ -494,6 +599,13 @@ class Fold{
       c.fillStyle=g;c.beginPath();c.arc(q.x,q.y,r,0,7);c.fill();
       const fog=Math.max(0,Math.min(.4,(mR-q.z)/(2*mR)*.45-.05));
       if(fog>0){c.fillStyle=`rgba(${bg},${fog})`;c.beginPath();c.arc(q.x,q.y,r,0,7);c.fill()}
+      if(this.whiten>.02){c.fillStyle=`rgba(255,255,255,${this.whiten*.78})`;c.beginPath();c.arc(q.x,q.y,r,0,7);c.fill()}
+      if(this.q&&Math.abs(this.q[i])>.5&&r>7){
+        const bx=q.x+r*.62,by=q.y-r*.62,br=Math.max(6,r*.38);
+        c.fillStyle='#fff';c.beginPath();c.arc(bx,by,br,0,7);c.fill();c.strokeStyle=this.q[i]>0?'#dc2626':'#2563eb';c.lineWidth=2;c.stroke();
+        c.fillStyle=this.q[i]>0?'#dc2626':'#2563eb';c.font=`800 ${br*1.5}px system-ui,sans-serif`;c.textAlign='center';c.textBaseline='middle';
+        c.fillText(this.q[i]>0?'+':'−',bx,by+br*.08);
+      }
       if(this.labels&&r>10){c.font=`700 ${Math.max(9,r*.62)}px system-ui,sans-serif`;c.textAlign='center';c.textBaseline='middle';
         c.lineWidth=3;c.strokeStyle='rgba(0,0,0,.55)';c.strokeText(res.abbr,q.x,q.y);c.fillStyle='#fff';c.fillText(res.abbr,q.x,q.y)}
       if(i===this.sel||i===this.hover){c.strokeStyle=i===this.sel?'#14213d':'#7c3aed';c.lineWidth=3;c.beginPath();c.arc(q.x,q.y,r+3,0,7);c.stroke();
@@ -516,7 +628,7 @@ class Fold{
     c.fillStyle='#fff';c.textAlign='left';c.textBaseline='middle';c.fillText(txt,x+8,y+12);
   }
   background(c,w,h,now){
-    const t=now/1000;
+    this.flowT+=.016*this.speed;const t=this.flowT;
     if(this.env==='water'){
       const g=c.createLinearGradient(0,0,0,h);g.addColorStop(0,'#e3f4ff');g.addColorStop(1,'#b9dffa');c.fillStyle=g;c.fillRect(0,0,w,h);
       for(const b of this.bubbles){
@@ -884,10 +996,134 @@ $('msAuto').onclick=()=>{
 };
 FA.onDone=mDone;FB.onDone=mDone;
 
+/* ============ DENATURE LAB ============ */
+const DEN_SEQ='Leu Val Asp Ile Phe Lys Ala Leu Glu Val Ile Arg Phe Leu Asp Ala Val Lys Ile Glu His'.split(' ').map(fromAbbr);
+const DEN_ABBR=DEN_SEQ.map(r=>r.abbr);
+const F3=new Fold($('cvD'),23);F3.showHalo=false;folds.push(F3);
+const RG_NATIVE=1.43,RG_UNFOLDED=2.2;
+const DN={temp:37,pH:7,ff:1,act:1,ready:false,started:false,cooked:false,cookTicks:0,wasDen:false,done:{},sust:{},hist:[],cond:null};
+const DN_CH=[
+  {id:'heat',t:'Heat wave',d:'Unfold the protein with temperature alone (keep pH near 7).'},
+  {id:'acid',t:'Acid attack',d:'Denature it with acid: pH 2 or lower, at body temperature or cooler.'},
+  {id:'base',t:'Base attack',d:'Denature it with a base: pH 12.5 or higher, at body temperature or cooler.'},
+  {id:'cold',t:'Chill out',d:'Cool it to 6 °C or less and hold. Is the shape damaged? Is it working?'},
+  {id:'cook',t:'Point of no return',d:'Boil it long enough that the proteins clump and cooling cannot undo it (like an egg white).'},
+  {id:'back',t:'Bring it back',d:'Denature the protein, then return to normal conditions so it refolds.'}
+];
+function renderDnCh(){
+  $('dnChallenges').innerHTML=DN_CH.map(c=>`<div class="ch ${DN.done[c.id]?'done':''}"><div class="tick">${DN.done[c.id]?'✓':''}</div><div><b>${c.t}</b><span class="muted small">${c.d}</span></div></div>`).join('')
+   +`<p class="small muted" style="margin:6px 0 0">${Object.keys(DN.done).length} of ${DN_CH.length} complete</p>`;
+}
+function completeDn(id){if(DN.done[id])return;DN.done[id]=true;renderDnCh();confetti();toast('🏆 Challenge complete: '+DN_CH.find(c=>c.id===id).t)}
+
+const PH_STOPS=[[0,[225,29,72]],[3,[249,115,22]],[5,[250,204,21]],[7,[74,222,128]],[9,[56,189,248]],[11,[99,102,241]],[14,[162,28,175]]];
+function phRGB(pH){
+  for(let i=1;i<PH_STOPS.length;i++){const [b,cb]=PH_STOPS[i],[a,ca]=PH_STOPS[i-1];
+    if(pH<=b){const t=(pH-a)/(b-a);return ca.map((v,k)=>Math.round(v+(cb[k]-v)*t))}}
+  return PH_STOPS[PH_STOPS.length-1][1];
+}
+const phWord=p=>p<3?'strongly acidic':p<6.5?'acidic':p<=7.5?'neutral':p<11?'basic':'strongly basic';
+const tWord=t=>t<=6?'cold':t<30?'cool':t<=40?'body temperature':t<60?'hot':t<95?'very hot':'boiling';
+
+function dnApply(){
+  const c=conditions(DN.temp,DN.pH,DEN_ABBR);
+  if(DN.cooked)c.att=Math.min(c.att,.06);
+  DN.cond=c;
+  F3.q=c.q;
+  const [r,g,b]=phRGB(DN.pH),dev=Math.min(1,Math.abs(DN.pH-7)/5);
+  F3.tint=`rgba(${r},${g},${b},${.06+.3*dev})`;
+  F3.frost=Math.max(0,Math.min(1,(14-DN.temp)/14))*.4;
+  F3.glow=Math.max(0,Math.min(1,(DN.temp-45)/55))*.5;
+  F3.speed=Math.max(.12,DN.temp/37);
+  if(DN.ready)F3.cond={T:c.T,att:c.att,q:c.q,es:c.es};
+  $('tempV').textContent=`${DN.temp} °C · ${tWord(DN.temp)}`;
+  $('phV').textContent=`${DN.pH.toFixed(1)} · ${phWord(DN.pH)}`;
+}
+function setConditions(t,p){$('tempR').value=t;$('phR').value=p;DN.temp=+t;DN.pH=+p;dnApply()}
+$('tempR').oninput=e=>{DN.temp=+e.target.value;dnApply()};
+$('phR').oninput=e=>{DN.pH=+e.target.value;dnApply()};
+$('qNormal').onclick=()=>setConditions(37,7);
+$('qFridge').onclick=()=>setConditions(4,7);
+$('qBoil').onclick=()=>setConditions(100,7);
+$('qLemon').onclick=()=>setConditions(37,2);
+$('qCleaner').onclick=()=>setConditions(37,12.5);
+$('dnLbl').onchange=e=>{F3.labels=e.target.checked};
+
+function dnReset(){
+  DN.ready=false;DN.cooked=false;DN.cookTicks=0;DN.wasDen=false;DN.sust={};DN.hist=[];DN.ff=1;
+  F3.cond=null;F3.whiten=0;F3.setAll(DEN_SEQ);
+  const c0=conditions(37,7,DEN_ABBR);F3.foldQ=c0.q;F3.foldEs=c0.es;F3.q=c0.q;
+  setConditions(37,7);
+  $('dStatus').className='muted';$('dStatus').textContent='Folding the starting protein…';
+  F3.begin(.14,380,true);
+}
+F3.onDone=()=>{DN.ready=true;dnApply()};
+$('dnReset').onclick=dnReset;
+function dnStart(){if(DN.started)return;DN.started=true;renderDnCh();dnReset()}
+
+function dnRg(){const P=F3.P;let r=0;for(const p of P)r+=p.x*p.x+p.y*p.y+p.z*p.z;return Math.sqrt(r/P.length)}
+function dnTick(){
+  if(!DN.started||!F3.cv.offsetParent)return;
+  if(!DN.ready){return}
+  const target=Math.max(0,Math.min(1,(RG_UNFOLDED-dnRg())/(RG_UNFOLDED-RG_NATIVE)));
+  DN.ff+=(target-DN.ff)*.25;
+  const ff=DN.ff,rate=DN.temp<37?Math.pow(2,(DN.temp-37)/10):1;
+  DN.act=ff*ff*rate;
+  // cooked: held very hot and unfolded
+  if(DN.temp>=72&&ff<.35)DN.cookTicks++;else DN.cookTicks=Math.max(0,DN.cookTicks-1);
+  if(!DN.cooked&&DN.cookTicks>=22){DN.cooked=true;dnApply();toast('🥚 The proteins clumped together. This can\'t be undone by cooling.')}
+  F3.whiten+=((DN.cooked?1:0)-F3.whiten)*.08;
+  if(ff<.3&&!DN.cooked)DN.wasDen=true;
+  // meters
+  $('dFold').style.width=ff*100+'%';$('dFoldT').textContent=Math.round(ff*100)+'%';
+  const act=Math.min(1,DN.act);$('dAct').style.width=act*100+'%';$('dActT').textContent=Math.round(act*100)+'%';
+  const net=DN.cond.q.reduce((a,b)=>a+b,0),pos=DN.cond.q.filter(v=>v>.5).length,neg=DN.cond.q.filter(v=>v<-.5).length;
+  $('dCharge').textContent=`Charged amino acids: ${pos} (+), ${neg} (−) · net charge ${net>0?'+':''}${net.toFixed(1)}`;
+  // status
+  const c=DN.cond;let head,cls;
+  if(DN.cooked){head='🥚 <b>Clumped.</b> The unfolded proteins stuck to each other, like an egg white turning solid white. Cooling can\'t reverse this.';cls='bad'}
+  else if(ff>=.85){head=DN.temp<=10?'🧊 <b>Chilled but intact.</b> The shape is fine; molecules just move slowly, so the enzyme works slowly. Warm it up and it speeds up again.':'✅ <b>Native shape.</b> Folded and working.';cls='good'}
+  else if(ff>=.5){head='⚠️ <b>Starting to unfold.</b> The core is loosening and the active shape is changing.';cls='info'}
+  else if(ff>=.2){head='❌ <b>Mostly unfolded.</b> Very little of the original shape is left.';cls='bad'}
+  else{head='❌ <b>Denatured.</b> No folded shape, so no function.';cls='bad'}
+  const why=[];
+  if(c.Dt>.12)why.push('🔥 <b>Heat:</b> faster-moving molecules shake the weak bonds apart, so the oily core and hydrogen bonds let go.');
+  if(c.Dp>.12||Math.abs(DN.pH-7)>2.2)why.push(DN.pH<7?`🍋 <b>Acid (pH ${DN.pH.toFixed(1)}):</b> extra H⁺ ions stick to the amino acids. The − charges disappear, almost everything becomes +, salt bridges vanish and like charges push apart.`:`🧼 <b>Base (pH ${DN.pH.toFixed(1)}):</b> extra OH⁻ ions pull H⁺ off the amino acids. The + charges disappear, almost everything becomes −, salt bridges vanish and like charges push apart.`);
+  if(!why.length&&DN.temp>10)why.push('🧂 At normal temperature and pH, the + and − charged amino acids pair up as <b>salt bridges</b> that help hold the fold.');
+  if(DN.temp<=10)why.push('🧊 <b>Cold:</b> slower molecules, but cold does not unfold proteins.');
+  $('dStatus').className='';$('dStatus').innerHTML=`<div class="callout ${cls}">${head}</div>${why.map(w=>`<p class="small" style="margin:8px 0 0">${w}</p>`).join('')}`;
+  // history + chart
+  DN.hist.push([ff,Math.min(1,DN.act)]);if(DN.hist.length>400)DN.hist.shift();drawPlot();
+  // challenges
+  const sus=(k,cond)=>{DN.sust[k]=cond?(DN.sust[k]||0)+1:0;if(DN.sust[k]>=14)completeDn(k)};
+  sus('heat',DN.temp>=50&&Math.abs(DN.pH-7)<1.5&&ff<.5);
+  sus('acid',DN.pH<=2&&DN.temp<=40&&ff<.5);
+  sus('base',DN.pH>=12.5&&DN.temp<=40&&ff<.5);
+  sus('cold',DN.temp<=6&&ff>.85&&DN.act<.3);
+  sus('cook',DN.cooked);
+  sus('back',DN.wasDen&&!DN.cooked&&DN.temp<=45&&DN.pH>=6&&DN.pH<=8.5&&ff>=.85);
+}
+function drawPlot(){
+  const cv=$('cvPlot'),dpr=Math.min(2,window.devicePixelRatio||1),w=cv.clientWidth,h=cv.clientHeight;if(!w||!h)return;
+  if(cv.width!==Math.round(w*dpr)||cv.height!==Math.round(h*dpr)){cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr)}
+  const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);
+  const L0=34,R0=8,T0=8,B0=16,pw=w-L0-R0,ph=h-T0-B0;
+  c.font='11px system-ui,sans-serif';c.fillStyle='#51607a';c.strokeStyle='#e3e9f3';c.lineWidth=1;c.textAlign='right';c.textBaseline='middle';
+  for(const v of[0,.5,1]){const y=T0+ph*(1-v);c.beginPath();c.moveTo(L0,y);c.lineTo(w-R0,y);c.stroke();c.fillText(Math.round(v*100)+'%',L0-5,y)}
+  c.textAlign='left';c.textBaseline='top';c.fillText('last minute →',L0,h-B0+3);
+  const H=DN.hist;if(H.length<2)return;
+  [[0,'#6d28d9'],[1,'#15803d']].forEach(([k,col])=>{
+    c.strokeStyle=col;c.lineWidth=2.5;c.lineJoin='round';c.beginPath();
+    H.forEach((p,i)=>{const x=L0+pw*(i/399)+pw*(1-(H.length-1)/399)*0,y=T0+ph*(1-p[k]);i?c.lineTo(x,y):c.moveTo(x,y)});c.stroke();
+  });
+}
+setInterval(dnTick,150);
+
 /* ============ TABS ============ */
 function showTab(n){
   document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===n));
   document.querySelectorAll('.tab').forEach(s=>s.classList.toggle('on',s.id==='tab-'+n));
+  if(n==='den')dnStart();
 }
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 
@@ -896,7 +1132,7 @@ for(const ch of'NPNNPNNPNN')L.seq.push(mk(ch==='N'?'n':'p'));
 F1.setAll(L.seq);renderChips();renderCh();mReset();setEnv('water');
 $('hudMsg').textContent='Drag to rotate · tap a bead to select';
 requestAnimationFrame(loop);
-window.__PF={F1,FA,FB,L,M};
+window.__PF={F1,FA,FB,F3,L,M,DN};
 </script>
 </body>
 </html>
