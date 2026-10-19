@@ -1096,9 +1096,9 @@ function dnTick(){
   DN.hist.push([ff,Math.min(1,DN.act)]);if(DN.hist.length>400)DN.hist.shift();drawPlot();
   // challenges
   const sus=(k,cond)=>{DN.sust[k]=cond?(DN.sust[k]||0)+1:0;if(DN.sust[k]>=14)completeDn(k)};
-  sus('heat',DN.temp>=50&&Math.abs(DN.pH-7)<1.5&&ff<.5);
-  sus('acid',DN.pH<=2&&DN.temp<=40&&ff<.5);
-  sus('base',DN.pH>=12.5&&DN.temp<=40&&ff<.5);
+  sus('heat',DN.temp>=50&&Math.abs(DN.pH-7)<1.5&&ff<.6);
+  sus('acid',DN.pH<=2&&DN.temp<=40&&ff<.6);
+  sus('base',DN.pH>=12.5&&DN.temp<=40&&ff<.6);
   sus('cold',DN.temp<=6&&ff>.85&&DN.act<.3);
   sus('cook',DN.cooked);
   sus('back',DN.wasDen&&!DN.cooked&&DN.temp<=45&&DN.pH>=6&&DN.pH<=8.5&&ff>=.85);
