@@ -126,11 +126,7 @@ textarea{min-height:76px;resize:vertical}
 <body>
 <header>
   <div class="wrap">
-    <div class="hrow"><h1>🧬 ProteinFold Lab</h1>
-      <div class="seg" role="group" aria-label="Mode">
-        <button id="modePred" aria-pressed="true">🎯 Predict first</button>
-        <button id="modeFree" aria-pressed="false">🎮 Free play</button>
-      </div></div>
+    <h1>🧬 ProteinFold Lab</h1>
     <p>The order of amino acids decides the shape of a protein. Build a chain, then watch it fold.</p>
     <nav role="tablist" aria-label="Sections">
       <button role="tab" aria-selected="true"  data-tab="lab">1 · Build &amp; Fold</button>
@@ -248,11 +244,20 @@ textarea{min-height:76px;resize:vertical}
     <h2>One tiny change, a different fold</h2>
     <p>Sickle cell disease starts with <b>one</b> DNA change. In β-globin (part of hemoglobin) it swaps position 6 from <b>glutamic acid</b> (polar) to <b>valine</b> (nonpolar). Below are the first 16 amino acids of normal β-globin (left) and a mutant copy (right).</p>
     <p class="muted small">Honesty check: this simple model can't predict how real hemoglobin sticks together, and in it the position-6 swap doesn't always stick out. What it does show: swapping <i>one</i> amino acid can change which beads end up inside or exposed, and <i>where</i> you swap matters. Folding has some randomness, so run each test a few times.</p>
-    <div class="row">
+    <div class="row" id="mMain">
       <button class="btn go" id="mFold">▶ Fold both</button>
       <button class="btn" id="mUnfold">↺ Unfold both</button>
+      <button class="btn" id="mStepBtn">👣 Step by step</button>
       <button class="btn" id="mReroll">🎲 New random start</button>
       <button class="btn" id="mReset">Reset to the sickle-cell swap</button>
+    </div>
+    <div class="row" id="mStepBar" hidden>
+      <button class="btn" id="msBack">◀ Back</button>
+      <button class="btn go" id="msNext">Forward ▶</button>
+      <button class="btn" id="msAuto">▶▶ Auto-play</button>
+      <button class="btn" id="msRestart">⏮ Restart</button>
+      <button class="btn" id="msExit">✕ Exit</button>
+      <span class="pill" id="msCount"><b>Amino acid 0 / 0</b></span>
     </div>
   </div>
   <div class="mut" style="margin-top:16px">
@@ -288,7 +293,7 @@ textarea{min-height:76px;resize:vertical}
     <h3>My experiments</h3>
     <p class="muted small noprint">Each fold you finish is added automatically. N = nonpolar, P = polar.</p>
     <div style="overflow-x:auto"><table id="logTable"><thead><tr>
-      <th>#</th><th>Sequence</th><th>Where</th><th>Nonpolar exposed</th><th>Polar exposed</th><th>My prediction</th><th>Result</th></tr></thead><tbody></tbody></table></div>
+      <th>#</th><th>Sequence</th><th>Where</th><th>Nonpolar exposed</th><th>Polar exposed</th><th>Result</th></tr></thead><tbody></tbody></table></div>
     <h3>Think about it</h3>
     <p><b>1.</b> Which pattern of polar and nonpolar amino acids made the most tightly folded protein? Use your data.</p><textarea id="q1"></textarea>
     <p><b>2.</b> Explain why nonpolar amino acids end up in the center of a protein in water, but on the outside in a membrane.</p><textarea id="q2"></textarea>
@@ -590,7 +595,7 @@ function confetti(){
 }
 
 /* ============ LAB TAB ============ */
-const L={seq:[],sel:-1,env:'water',quiz:true,pred:null,last:null,logs:[],done:{},best:null};
+const L={seq:[],sel:-1,env:'water',last:null,logs:[],done:{},best:null};
 const ST={on:false,k:1,auto:false,timer:null};
 const F1=new Fold($('cv1'),7);folds.push(F1);
 const pct=v=>v==null?'–':Math.round(v*100)+'%';
@@ -646,35 +651,16 @@ $('envWater').onclick=()=>setEnv('water');$('envMem').onclick=()=>setEnv('membra
 let hintT;function hint(t){const h=$('hint1');h.textContent=t;h.classList.add('show');clearTimeout(hintT);hintT=setTimeout(()=>h.classList.remove('show'),3400)}
 
 function resetResult(){
-  L.pred=null;
   if(F1.mode==='strand'||L.seq.length<4){
     $('resultBody').className='muted';
     $('resultBody').innerHTML=L.seq.length<4?'Add at least 4 amino acids, then press <b>Fold it!</b>':'Ready. Press <b>Fold it!</b>';
   }
 }
 
-/* prediction → fold */
-function ctName(env){return env==='water'?'orange (nonpolar)':'blue (polar)'}
 function pressFold(){
   if(ST.on)exitStep();
   if(L.seq.length<4){hint('Add at least 4 amino acids first');return}
-  if(F1.mode==='strand'){
-    if(L.quiz){
-      const e=L.env==='water'?'This chain is dropped into <b>water</b>.':'This chain is dropped into an <b>oily membrane</b>.';
-      $('resultBody').className='';
-      $('resultBody').innerHTML=`<b>Predict first!</b> ${e}<br>Where will the ${ctName(L.env)} amino acids end up?
-        <div class="opts">
-          <button class="btn" data-pred="inside">Tucked inside, in the middle</button>
-          <button class="btn" data-pred="outside">Out on the surface</button>
-          <button class="btn" data-pred="even">Spread out evenly</button>
-          <button class="btn small" data-pred="skip">Skip the prediction</button></div>`;
-    }else startFold(null);
-  }else{F1.begin(.14,380,false);L.pred=null}
-}
-$('resultBody').addEventListener('click',e=>{const b=e.target.closest('[data-pred]');if(!b)return;
-  startFold(b.dataset.pred==='skip'?null:b.dataset.pred)});
-function startFold(pred){
-  L.pred=pred;F1.begin(.14,380,false);
+  F1.begin(.14,380,false);
   $('resultBody').className='muted';$('resultBody').innerHTML='Folding… watch where the beads go. 👀';
 }
 $('foldBtn').onclick=pressFold;
@@ -732,28 +718,16 @@ function completeCh(id){if(L.done[id])return;L.done[id]=true;renderCh();confetti
 F1.onDone=f=>{
   if(f.stepMode){stepSettled();return}
   const m=f.summary();L.last=m;meters();
-  const ex=explain(m),act=classify(m);let pr='';
-  if(L.pred){const ok=L.pred===act,lab={inside:'inside',outside:'outside',even:'spread evenly'};
-    pr=`<div class="callout ${ok?'good':'bad'}">${ok?'✅ Your prediction was right!':'🔍 Not quite.'} You predicted <b>${lab[L.pred]}</b>; the result was <b>${lab[act]}</b>.</div>`}
+  const ex=explain(m),act=classify(m);
   $('resultBody').className='';
-  $('resultBody').innerHTML=`<div class="callout ${ex.cls}">${ex.t}</div>${pr}
+  $('resultBody').innerHTML=`<div class="callout ${ex.cls}">${ex.t}</div>
     <p class="small muted" style="margin:8px 0 0">Press <b>Fold it!</b> again to re-run: folding has a random start, so check whether you get the same pattern.</p>`;
   if(f.silent)return;
-  L.logs.push({seq:seqString(L.seq),env:m.env,expNp:m.expNp,expP:m.expP,pred:L.pred?{inside:'Inside',outside:'Outside',even:'Even'}[L.pred]:'–',res:{inside:'Inside',outside:'Outside',even:'Even'}[act],len:m.len});
+  L.logs.push({seq:seqString(L.seq),env:m.env,expNp:m.expNp,expP:m.expP,res:{inside:'Inside',outside:'Outside',even:'Even'}[act],len:m.len});
   if(L.logs.length>30)L.logs.shift();renderLog();
   for(const c of CH)if(c.id!=='mut'&&c.test(m,L.seq))completeCh(c.id);
   if(m.env==='water'&&m.nNp>=1&&m.minNp<=.1&&(!L.best||m.len<L.best)){L.best=m.len;renderCh()}
-  L.pred=null;
 };
-
-/* ---------- free play ---------- */
-function setQuiz(q){
-  L.quiz=q;$('modePred').setAttribute('aria-pressed',q);$('modeFree').setAttribute('aria-pressed',!q);
-  toast(q?'Predict first: you will guess before each fold':'Free play: no prediction questions');
-  if(!q&&F1.mode==='strand'&&$('resultBody').querySelector('[data-pred]'))startFold(null);
-  if(!q&&FA.mode==='strand'&&$('mBody').querySelector('[data-mp]'))mStart(null);
-}
-$('modePred').onclick=()=>setQuiz(true);$('modeFree').onclick=()=>setQuiz(false);
 
 /* ---------- step by step, bond by bond ---------- */
 function enterStep(){
@@ -771,28 +745,33 @@ function exitStep(){
 }
 function stepReset(){
   clearTimeout(ST.timer);ST.k=0;ST.auto=false;
-  F1.P=F1.res.map((_,i)=>F1.target(i));F1.show=0;F1.mode='folded';F1.hiBond=null;F1.exp=[];F1.sel=-1;L.sel=-1;renderChips();
+  emptyFold(F1);L.sel=-1;renderChips();
   stepNarrate();stepUI();
 }
-function stepGo(k){
-  const N=L.seq.length;k=Math.max(0,Math.min(N,k));if(k===ST.k)return;
-  clearTimeout(ST.timer);const now=performance.now();
-  if(k>ST.k){                       // Forward: bond the next amino acid on
-    const i=k-1,P=F1.P;
+/* grow or shrink a fold view by one amino acid; shared by both tabs */
+function growFold(f,k,prev){
+  const now=performance.now();
+  if(k>prev){                       // Forward: bond the next amino acid on
+    const i=k-1,P=f.P;
     if(i===0)P[0]={x:0,y:0,z:0};
     else{
-      const prev=P[i-1];let cx=0,cy=0,cz=0;
+      const q=P[i-1];let cx=0,cy=0,cz=0;
       for(let j=0;j<i;j++){cx+=P[j].x;cy+=P[j].y;cz+=P[j].z}cx/=i;cy/=i;cz/=i;
-      let dx=prev.x-cx,dy=prev.y-cy,dz=prev.z-cz,d=Math.hypot(dx,dy,dz);
+      let dx=q.x-cx,dy=q.y-cy,dz=q.z-cz,d=Math.hypot(dx,dy,dz);
       if(d<.2){dx=1;dy=.2;dz=.1;d=Math.hypot(dx,dy,dz)}
-      const j=()=>(Math.random()-.5)*.3;
-      P[i]={x:prev.x+dx/d+j(),y:prev.y+dy/d+j(),z:prev.z+dz/d+j()};
+      const j=()=>(f.rand()-.5)*.3;
+      P[i]={x:q.x+dx/d+j(),y:q.y+dy/d+j(),z:q.z+dz/d+j()};
     }
-    F1.born[i]=now;F1.hiBond=i>0?{i:i-1,t:now}:null;F1.show=k;F1.begin(i>0?.06:.02,i>0?160:40,true);
+    f.born[i]=now;f.hiBond=i>0?{i:i-1,t:now}:null;f.show=k;f.begin(i>0?.06:.02,i>0?160:40,true);
   }else{                            // Back: remove the last amino acid
-    F1.show=k;F1.hiBond=null;F1.exp=[];
-    if(k>0)F1.begin(.04,140,true);else F1.mode='folded';
+    f.show=k;f.hiBond=null;f.exp=[];
+    if(k>0)f.begin(.04,140,true);else f.mode='folded';
   }
+}
+function emptyFold(f){f.P=f.res.map((_,i)=>f.target(i));f.show=0;f.mode='folded';f.hiBond=null;f.exp=[];f.sel=-1;f.stepMode=true}
+function stepGo(k){
+  const N=L.seq.length;k=Math.max(0,Math.min(N,k));if(k===ST.k)return;
+  clearTimeout(ST.timer);growFold(F1,k,ST.k);
   ST.k=k;stepNarrate();stepUI();
 }
 function stepNarrate(extra=''){
@@ -824,9 +803,16 @@ function stepSettled(){
 }
 $('stepBtn').onclick=enterStep;
 addEventListener('keydown',e=>{
-  if(!ST.on||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
-  if(e.key==='ArrowRight'){e.preventDefault();stepGo(ST.k+1)}
-  if(e.key==='ArrowLeft'){e.preventDefault();ST.auto=false;stepGo(ST.k-1)}
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  const lab=$('tab-lab').classList.contains('on'),mut=$('tab-mut').classList.contains('on');
+  if(lab&&ST.on){
+    if(e.key==='ArrowRight'){e.preventDefault();stepGo(ST.k+1)}
+    if(e.key==='ArrowLeft'){e.preventDefault();ST.auto=false;stepGo(ST.k-1)}
+  }
+  if(mut&&MS.on){
+    if(e.key==='ArrowRight'){e.preventDefault();mStepGo(MS.k+1)}
+    if(e.key==='ArrowLeft'){e.preventDefault();MS.auto=false;mStepGo(MS.k-1)}
+  }
 });
 $('stNext').onclick=()=>stepGo(ST.k+1);
 $('stBack').onclick=()=>{ST.auto=false;stepGo(ST.k-1)};
@@ -841,66 +827,115 @@ $('stAuto').onclick=()=>{
 /* ============ MUTATION LAB ============ */
 const NORMAL='Val His Leu Thr Pro Glu Glu Lys Ser Ala Val Thr Ala Leu Trp Gly'.split(' ').map(fromAbbr);
 const FA=new Fold($('cvA'),11),FB=new Fold($('cvB'),11);folds.push(FA,FB);
-const M={seed:11,seqB:[],pred:null,done:0,sums:{}};
+const M={seed:11,seqB:[],done:0};
+const MS={on:false,k:0,auto:false,timer:null};
 function sickle(){M.seqB=NORMAL.map(r=>({...r}));M.seqB[5]=fromAbbr('Val')}
 function renderMChips(){
   $('chipsA').innerHTML=NORMAL.map((r,i)=>chipHTML(r,i)).join('');
   $('chipsB').innerHTML=M.seqB.map((r,i)=>chipHTML(r,i,r.abbr!==NORMAL[i].abbr?'changed':'')).join('');
 }
-function mReset(clearFold){
+function mReset(){
+  mExitStep();
   sickle();FA.setAll(NORMAL);FB.setAll(M.seqB);FA.rand=mulberry32(M.seed);FB.rand=mulberry32(M.seed);
-  M.pred=null;M.done=0;renderMChips();mIntro();
+  M.done=0;renderMChips();mIntro();
 }
 function mIntro(){$('mBody').className='muted';$('mBody').innerHTML='Press <b>Fold both</b>.'}
 $('chipsB').addEventListener('click',e=>{
-  const b=e.target.closest('.chip');if(!b)return;const i=+b.dataset.i,cur=M.seqB[i];
+  const b=e.target.closest('.chip');if(!b)return;mExitStep();const i=+b.dataset.i,cur=M.seqB[i];
   const nt=cur.t==='n'?'p':'n';
   // tapping the original residue's type again restores the real amino acid
   M.seqB[i]=NORMAL[i].t===nt?{...NORMAL[i]}:mk(nt);
   FB.retype(i,M.seqB[i]);renderMChips();
   if(FB.mode==='strand'&&FA.mode==='strand')mIntro();
 });
-$('mFold').onclick=()=>{
-  if(FA.mode==='strand'&&L.quiz){
-    $('mBody').className='';
-    $('mBody').innerHTML=`<b>Predict:</b> compared with the normal protein, how many <span style="color:var(--bad)"><b>red-halo</b></span> beads (oily beads stuck on the outside) will the mutant have?
-      <div class="opts"><button class="btn" data-mp="more">More</button><button class="btn" data-mp="same">About the same</button><button class="btn" data-mp="fewer">Fewer</button><button class="btn small" data-mp="skip">Skip</button></div>`;
-  }else mStart(null);
-};
-$('mBody').addEventListener('click',e=>{const b=e.target.closest('[data-mp]');if(b)mStart(b.dataset.mp==='skip'?null:b.dataset.mp)});
-function mStart(p){M.pred=p;M.done=0;FA.begin(.14,380,false);FB.begin(.14,380,false);$('mBody').className='muted';$('mBody').innerHTML='Folding both…'}
-$('mUnfold').onclick=()=>{FA.unfold();FB.unfold();mIntro()};
-$('mReroll').onclick=()=>{M.seed=(M.seed*7+13)%9973;FA.rand=mulberry32(M.seed);FB.rand=mulberry32(M.seed);FA.unfold();FB.unfold();mIntro();toast('New random start. Fold again.')};
+function mStart(){mExitStep();M.done=0;FA.begin(.14,380,false);FB.begin(.14,380,false);$('mBody').className='muted';$('mBody').innerHTML='Folding both…'}
+$('mFold').onclick=mStart;
+$('mUnfold').onclick=()=>{mExitStep();FA.unfold();FB.unfold();mIntro()};
+$('mReroll').onclick=()=>{mExitStep();M.seed=(M.seed*7+13)%9973;FA.rand=mulberry32(M.seed);FB.rand=mulberry32(M.seed);FA.unfold();FB.unfold();mIntro();toast('New random start. Fold again.')};
 $('mReset').onclick=()=>{mReset();};
-function mDone(){
-  if(++M.done<2)return;
+function mCompare(){
   const a=FA.summary(),b=FB.summary(),diff=NORMAL.map((r,i)=>r.abbr!==M.seqB[i].abbr).filter(Boolean).length;
-  let verdict=b.mism>a.mism?'more':b.mism<a.mism?'fewer':'same';
-  let pr='';
-  if(M.pred){pr=`<div class="callout ${M.pred===verdict?'good':'bad'}">${M.pred===verdict?'✅ Prediction correct!':'🔍 Not what you predicted.'} You said <b>${M.pred}</b>; the mutant had <b>${verdict}</b>.</div>`}
   $('mBody').className='';
   $('mBody').innerHTML=`<table><thead><tr><th></th><th>Normal</th><th>Mutant</th></tr></thead><tbody>
     <tr><td>Nonpolar exposed</td><td>${pct(a.expNp)}</td><td>${pct(b.expNp)}</td></tr>
     <tr><td>Polar exposed</td><td>${pct(a.expP)}</td><td>${pct(b.expP)}</td></tr>
     <tr><td>Red-halo beads (oily &amp; stuck outside)</td><td>${a.mism}</td><td>${b.mism}</td></tr></tbody></table>
     <p style="margin:8px 0 0">${diff===0?'The mutant is identical to normal. Flip a chip on the right.':`You changed <b>${diff}</b> amino acid${diff>1?'s':''}. Look at both models: did the core change? Which beads moved?`}</p>
-    ${pr}<p class="small muted" style="margin:8px 0 0">Red-halo beads can stick to other proteins, one reason a small change can have big effects. Try <b>New random start</b> to see how consistent the result is.</p>`;
-  L.logs.push({seq:seqString(M.seqB),env:'water',expNp:b.expNp,expP:b.expP,pred:M.pred?M.pred[0].toUpperCase()+M.pred.slice(1)+' halos':'–',res:`Mutation lab: ${diff} swap(s), halos ${a.mism}→${b.mism}`,len:b.len});renderLog();
+    <p class="small muted" style="margin:8px 0 0">Red-halo beads can stick to other proteins, one reason a small change can have big effects. Try <b>New random start</b> to see how consistent the result is.</p>`;
+  L.logs.push({seq:seqString(M.seqB),env:'water',expNp:b.expNp,expP:b.expP,res:`Mutation lab: ${diff} swap(s), halos ${a.mism}→${b.mism}`,len:b.len});renderLog();
   if(b.mism>a.mism&&diff>0)completeCh('mut');
 }
+function mDone(f){
+  if(f.stepMode){mStepSettled();return}
+  if(++M.done<2)return;
+  mCompare();
+}
+
+/* ---- mutation lab: step by step (both chains grow together) ---- */
+function mDim(){document.querySelectorAll('#chipsA .chip,#chipsB .chip').forEach(c=>{c.style.opacity=MS.on&&+c.dataset.i>=MS.k?.3:''})}
+function mEnterStep(){
+  if(MS.on){mExitStep();return}
+  MS.on=true;FA.stepMode=FB.stepMode=true;$('mMain').hidden=true;$('mStepBar').hidden=false;mStepReset();
+}
+function mExitStep(){
+  if(!MS.on)return;
+  clearTimeout(MS.timer);MS.on=false;MS.auto=false;
+  for(const f of[FA,FB]){f.stepMode=false;f.show=null;f.hiBond=null;f.mode='strand';f.exp=[]}
+  $('mStepBar').hidden=true;$('mMain').hidden=false;mDim();mIntro();
+}
+function mStepReset(){
+  clearTimeout(MS.timer);MS.k=0;MS.auto=false;emptyFold(FA);emptyFold(FB);
+  FA.rand=mulberry32(M.seed);FB.rand=mulberry32(M.seed);mNarrate();mStepUI();
+}
+function mStepGo(k){
+  const N=NORMAL.length;k=Math.max(0,Math.min(N,k));if(k===MS.k)return;
+  clearTimeout(MS.timer);growFold(FA,k,MS.k);growFold(FB,k,MS.k);MS.k=k;mNarrate();mStepUI();
+}
+function mNarrate(extra=''){
+  const N=NORMAL.length,k=MS.k,ty=r=>r.t==='n'?'nonpolar':'polar';let h;
+  if(k===0)h=`<b>Both chains are empty.</b> Press <b>Forward ▶</b> to add amino acid 1 to each. <b>◀ Back</b> removes the last one.`;
+  else{const a=NORMAL[k-1],b=M.seqB[k-1];
+    h=a.abbr===b.abbr?`<b>Amino acid ${k} of ${N}:</b> both chains add <b>${a.name}</b> (${ty(a)}).`
+      :`<b>Amino acid ${k} of ${N}: the swap!</b> Normal adds <b>${a.name}</b> (${ty(a)}) but the mutant adds <b>${b.name}</b> (${ty(b)}).`}
+  $('mBody').className='';$('mBody').innerHTML=`<div class="callout info">${h}</div>${extra}`;
+}
+function mStepUI(){
+  const N=NORMAL.length;
+  $('msCount').innerHTML=`<b>Amino acid ${MS.k} / ${N}</b>`;
+  $('msBack').disabled=MS.k<=0;$('msNext').disabled=MS.k>=N;
+  {const n=NORMAL[MS.k],m=M.seqB[MS.k];$('msNext').textContent=MS.k>=N?'✔ Complete':`Forward ▶ +${n.abbr}${m.abbr!==n.abbr?' / '+m.abbr:''}`}
+  $('msAuto').textContent=MS.auto?'⏸ Pause':'▶▶ Auto-play';mDim();
+}
+function mStepSettled(){
+  if(!MS.on||FA.mode!=='folded'||FB.mode!=='folded')return;
+  const N=NORMAL.length,a=FA.summary(),b=FB.summary();
+  if(MS.k>=N){MS.auto=false;mStepUI();mCompare();return}
+  mNarrate(`<div class="callout">Oily beads exposed: normal <b>${pct(a.expNp)}</b> · mutant <b>${pct(b.expNp)}</b>. Red halos: normal <b>${a.mism}</b> · mutant <b>${b.mism}</b>.</div>`);
+  if(MS.auto)MS.timer=setTimeout(()=>mStepGo(MS.k+1),800);
+}
+$('mStepBtn').onclick=mEnterStep;
+$('msNext').onclick=()=>mStepGo(MS.k+1);
+$('msBack').onclick=()=>{MS.auto=false;mStepGo(MS.k-1)};
+$('msRestart').onclick=mStepReset;
+$('msExit').onclick=mExitStep;
+$('msAuto').onclick=()=>{
+  if(MS.auto){MS.auto=false;clearTimeout(MS.timer);mStepUI();return}
+  if(MS.k>=NORMAL.length)mStepReset();
+  MS.auto=true;mStepUI();if(FA.mode==='folded'&&FB.mode==='folded')MS.timer=setTimeout(()=>mStepGo(MS.k+1),500);
+};
 FA.onDone=mDone;FB.onDone=mDone;
 
 /* ============ WORKSHEET ============ */
 function renderLog(){
   const tb=document.querySelector('#logTable tbody');
-  tb.innerHTML=L.logs.length?L.logs.map((r,i)=>`<tr><td>${i+1}</td><td class="seqs">${r.seq}</td><td>${r.env==='water'?'Water':'Membrane'}</td><td>${pct(r.expNp)}</td><td>${pct(r.expP)}</td><td>${r.pred}</td><td>${r.res}</td></tr>`).join('')
-   :'<tr><td colspan="7" class="muted">No experiments yet. Fold a protein!</td></tr>';
+  tb.innerHTML=L.logs.length?L.logs.map((r,i)=>`<tr><td>${i+1}</td><td class="seqs">${r.seq}</td><td>${r.env==='water'?'Water':'Membrane'}</td><td>${pct(r.expNp)}</td><td>${pct(r.expP)}</td><td>${r.res}</td></tr>`).join('')
+   :'<tr><td colspan="6" class="muted">No experiments yet. Fold a protein!</td></tr>';
 }
 $('stuDate').value=new Date().toLocaleDateString();
 $('printBtn').onclick=()=>{showTab('sheet');setTimeout(()=>print(),50)};
 $('copyBtn').onclick=async()=>{
-  let t=`ProteinFold Lab Worksheet\nName: ${$('stuName').value}  Date: ${$('stuDate').value}\n\n#\tSequence\tWhere\tNonpolar exposed\tPolar exposed\tPrediction\tResult\n`;
-  t+=L.logs.map((r,i)=>[i+1,r.seq,r.env,pct(r.expNp),pct(r.expP),r.pred,r.res].join('\t')).join('\n');
+  let t=`ProteinFold Lab Worksheet\nName: ${$('stuName').value}  Date: ${$('stuDate').value}\n\n#\tSequence\tWhere\tNonpolar exposed\tPolar exposed\tResult\n`;
+  t+=L.logs.map((r,i)=>[i+1,r.seq,r.env,pct(r.expNp),pct(r.expP),r.res].join('\t')).join('\n');
   for(let i=1;i<=4;i++)t+=`\n\nQ${i}: ${$('q'+i).value}`;
   try{await navigator.clipboard.writeText(t);toast('Copied! Paste it into your doc.')}catch(e){toast('Copy blocked. Use Print / Save as PDF instead.')}
 };

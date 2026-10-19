@@ -8,13 +8,13 @@ from polar and nonpolar amino acids and watch it fold in 3D.
 
 ## What students do
 1. **Build & Fold**: choose the order of polar (blue) and nonpolar (orange) amino acids,
-   predict where each type will end up, then watch the chain collapse. Drag to rotate, hover for the
+   then watch the chain collapse. Drag to rotate, hover for the
    amino acid's name, switch between a watery cell and an oily membrane, and hold *Heat* to
    denature the protein and watch it refold on cooling.
-2. **Mutation Lab**: compare a normal β-globin fragment with a mutant (sickle-cell swap, or any swap).
-3. **Worksheet**: runs and predictions are logged automatically; print/save as PDF or copy as text.
+2. **Mutation Lab**: compare a normal β-globin fragment with a mutant (sickle-cell swap, or any swap),
+   folded all at once or stepped through with Back / Forward as both chains grow together.
+3. **Worksheet**: runs are logged automatically; print/save as PDF or copy as text.
 
-**Free play** (header switch) turns off all prediction questions in both tabs.
 **Step by step** starts empty. **Forward ▶** adds the next amino acid (the new peptide bond flashes and the
 chain folds around it); **◀ Back** removes the last one. Also Auto-play, Restart, and arrow-key control.
 
