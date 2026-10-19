@@ -26,7 +26,7 @@ nav button:focus-visible,button:focus-visible,select:focus-visible,textarea:focu
 main{padding:16px}
 .tab{display:none}.tab.on{display:block}
 .lab{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(300px,1fr);gap:16px;align-items:start}
-@media(max-width:900px){.lab{grid-template-columns:1fr}}
+@media(max-width:900px){.lab{grid-template-columns:1fr}.lab>div{display:contents}.lab .card{margin-top:0}#stageCard{order:1}#resultCard{order:2}#buildCard{order:3}#chCard{order:4}#whyCard{order:5}}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 1px 2px rgba(20,33,61,.05)}
 .card+.card{margin-top:16px}
 .card h2{margin:0 0 6px;font-size:1.1rem}
@@ -145,7 +145,7 @@ textarea{min-height:76px;resize:vertical}
 <section class="tab on" id="tab-lab">
   <div class="lab">
     <div>
-      <div class="card">
+      <div class="card" id="stageCard">
         <div class="hud top">
           <div class="seg" role="group" aria-label="Environment">
             <button id="envWater" aria-pressed="true">💧 Water (cell)</button>
@@ -167,8 +167,8 @@ textarea{min-height:76px;resize:vertical}
           <span class="pill small" id="hudMsg">Drag to rotate</span>
         </div>
         <div class="hud bottom" id="stepBar" hidden>
-          <button class="btn go" id="stNext">➕ Add next amino acid</button>
           <button class="btn" id="stBack">◀ Back</button>
+          <button class="btn go" id="stNext">Forward ▶</button>
           <button class="btn" id="stAuto">▶▶ Auto-play</button>
           <button class="btn" id="stRestart">⏮ Restart</button>
           <button class="btn" id="stExit">✕ Exit</button>
@@ -180,7 +180,20 @@ textarea{min-height:76px;resize:vertical}
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="resultCard">
+        <h2>What happened?</h2>
+        <div id="resultBody" class="muted">Add at least 4 amino acids, then press <b>Fold it!</b></div>
+      </div>
+
+      <div class="card" id="chCard">
+        <h2>🏆 Challenges</h2>
+        <div id="challenges"></div>
+      </div>
+
+    </div>
+
+    <div>
+      <div class="card" id="buildCard">
         <h2>Build your protein <span class="muted small">(the amino acid order)</span></h2>
         <div class="legend">
           <span><i class="dot np"></i><b>Nonpolar</b> = oily, avoids water</span>
@@ -215,20 +228,7 @@ textarea{min-height:76px;resize:vertical}
         </div>
         <p class="muted small" style="margin:8px 0 0">Tip: click a chip <i>or</i> a bead in the 3D model to select it. Hover for the amino acid's name.</p>
       </div>
-    </div>
-
-    <div>
-      <div class="card" id="resultCard">
-        <h2>What happened?</h2>
-        <div id="resultBody" class="muted">Add at least 4 amino acids, then press <b>Fold it!</b></div>
-      </div>
-
-      <div class="card">
-        <h2>🏆 Challenges</h2>
-        <div id="challenges"></div>
-      </div>
-
-      <div class="card">
+      <div class="card" id="whyCard">
         <details>
           <summary>Why does a protein fold?</summary>
           <p>Your DNA gives the <b>order</b> of amino acids (the protein's <i>primary structure</i>).</p>
@@ -758,7 +758,7 @@ function enterStep(){
   if(ST.on){exitStep();return}
   if(L.seq.length<2){hint('Add at least 2 amino acids first');return}
   ST.on=true;ST.auto=false;F1.stepMode=true;F1.heat=false;$('stepBar').hidden=false;$('mainBar').hidden=true;
-  stepReset();hint('Press ➕ Add next amino acid. Each one bonds on, then the chain folds.');
+  stepReset();hint('Press Forward ▶. Each amino acid bonds on, then the chain folds.');
 }
 function exitStep(){
   if(!ST.on)return;
@@ -788,7 +788,7 @@ function stepGo(k){
 }
 function stepNarrate(extra=''){
   const N=L.seq.length,k=ST.k,ty=r=>r.t==='n'?'nonpolar':'polar';let h;
-  if(k===1)h=`<b>Amino acid 1:</b> <b>${L.seq[0].name}</b> (${ty(L.seq[0])}). Press <b>➕ Add next amino acid</b> to bond the next one on.`;
+  if(k===1)h=`<b>Amino acid 1:</b> <b>${L.seq[0].name}</b> (${ty(L.seq[0])}). Press <b>Forward ▶</b> to bond the next one on.`;
   else{const a=L.seq[k-2],b=L.seq[k-1];
     h=`<b>Amino acid ${k} of ${N}</b> joins: ${a.abbr} ⟶ ${b.abbr}<br>A <b>peptide bond</b> forms (dehydration synthesis releases one water) and <b>${b.name}</b> (${ty(b)}) joins the chain.`}
   if(k===N)h+=`<br><b>Chain complete!</b> Press <b>Restart</b> to watch again, or <b>Exit</b> to edit the sequence.`;
@@ -798,7 +798,8 @@ function stepUI(){
   const N=L.seq.length;
   $('stepCount').innerHTML=`<b>Amino acid ${ST.k} / ${N}</b>`;
   $('stBack').disabled=ST.k<=1;$('stNext').disabled=ST.k>=N;
-  $('stNext').textContent=ST.k>=N?'✔ Chain complete':`➕ Add amino acid ${ST.k+1} (${L.seq[ST.k].abbr})`;
+  $('stNext').textContent=ST.k>=N?'✔ Complete':`Forward ▶ +${L.seq[ST.k].abbr}`;
+  $('stNext').title=ST.k>=N?'All amino acids added':`Add amino acid ${ST.k+1}: ${L.seq[ST.k].name}`;
   $('stAuto').textContent=ST.auto?'⏸ Pause':'▶▶ Auto-play';
   dimChips();
 }
