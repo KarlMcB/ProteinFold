@@ -751,7 +751,7 @@ $('preset').onchange=e=>{
   const v=e.target.value;if(!v)return;exitStep();
   const s=v==='rand'?Array.from({length:14},()=>Math.random()<.5?'N':'P').join(''):PRESETS[v];
   L.seq=[...s].map(ch=>mk(ch==='N'?'n':'p'));L.sel=-1;F1.setAll(L.seq);resetResult();renderChips();
-  hint('Predict the shape, then press Fold it!');e.target.value='';
+  hint('Pattern loaded. Press Fold it!');e.target.value='';
 };
 
 function setEnv(e){

@@ -36,3 +36,6 @@ zipper test, sticky-swap detective) give students goals.
 ## Development
 All code lives in `index.html`. The physics is between the `==SIM-START==` / `==SIM-END==` markers
 so it can be unit-tested in Node.
+
+## Student worksheet
+`ProteinFold_Student_Worksheet.docx`: a 3-page, 9th-grade worksheet that walks students through all three tabs (data tables, short-answer questions, challenge checklist, and a bonus design task).
