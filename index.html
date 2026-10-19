@@ -113,13 +113,6 @@ textarea{min-height:76px;resize:vertical}
 #confetti{position:fixed;inset:0;pointer-events:none;z-index:15}
 .sr{position:absolute;left:-9999px}
 
-@media print{
-  header,.tab:not(#tab-sheet),.toast,#confetti,.noprint{display:none!important}
-  body{background:#fff}
-  #tab-sheet{display:block!important}
-  .card{box-shadow:none;border:0;padding:0}
-  textarea{border:1px solid #999;min-height:90px}
-}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -131,7 +124,6 @@ textarea{min-height:76px;resize:vertical}
     <nav role="tablist" aria-label="Sections">
       <button role="tab" aria-selected="true"  data-tab="lab">1 · Build &amp; Fold</button>
       <button role="tab" aria-selected="false" data-tab="mut">2 · Mutation Lab</button>
-      <button role="tab" aria-selected="false" data-tab="sheet">3 · My Worksheet</button>
     </nav>
   </div>
 </header>
@@ -278,29 +270,6 @@ textarea{min-height:76px;resize:vertical}
   </div>
 </section>
 
-<!-- ================= TAB 3 ================= -->
-<section class="tab" id="tab-sheet">
-  <div class="card">
-    <h2>My Lab Worksheet</h2>
-    <div class="row noprint" style="margin-bottom:10px">
-      <button class="btn go" id="printBtn">🖨 Print / Save as PDF</button>
-      <button class="btn" id="copyBtn">📋 Copy as text</button>
-    </div>
-    <div class="row" style="margin-bottom:10px">
-      <div style="flex:1;min-width:200px"><label for="stuName"><b>Name</b></label><input type="text" id="stuName" autocomplete="off"></div>
-      <div style="flex:1;min-width:200px"><label for="stuDate"><b>Date</b></label><input type="text" id="stuDate" autocomplete="off"></div>
-    </div>
-    <h3>My experiments</h3>
-    <p class="muted small noprint">Each fold you finish is added automatically. N = nonpolar, P = polar.</p>
-    <div style="overflow-x:auto"><table id="logTable"><thead><tr>
-      <th>#</th><th>Sequence</th><th>Where</th><th>Nonpolar exposed</th><th>Polar exposed</th><th>Result</th></tr></thead><tbody></tbody></table></div>
-    <h3>Think about it</h3>
-    <p><b>1.</b> Which pattern of polar and nonpolar amino acids made the most tightly folded protein? Use your data.</p><textarea id="q1"></textarea>
-    <p><b>2.</b> Explain why nonpolar amino acids end up in the center of a protein in water, but on the outside in a membrane.</p><textarea id="q2"></textarea>
-    <p><b>3.</b> What happened when you changed just one amino acid? Why could that matter for a living cell?</p><textarea id="q3"></textarea>
-    <p><b>4.</b> When you heated the protein and then let it cool, did it fold back the same way? What does that suggest about what decides a protein's shape?</p><textarea id="q4"></textarea>
-  </div>
-</section>
 </main>
 
 <div class="toast" id="toast" role="status"></div>
@@ -492,7 +461,6 @@ class Fold{
     const c=this.cx;c.setTransform(dpr,0,0,dpr,0,0);
     this.background(c,w,h,now);
     const N=this.n;this.proj=[];if(!N){return}
-    if(!reduceMotion&&now-this.lastTouch>2500)this.yaw+=.004;
     const cy=Math.cos(this.yaw),sy=Math.sin(this.yaw),cp=Math.cos(this.pitch),sp=Math.sin(this.pitch);
     const PV=this.P.slice(0,N);let gx=0,gy=0,gz=0;for(const p of PV){gx+=p.x;gy+=p.y;gz+=p.z}gx/=N;gy/=N;gz/=N;
     const R=PV.map(p=>{const x=p.x-gx,y=p.y-gy,z=p.z-gz;const x1=x*cy+z*sy,z1=-x*sy+z*cy;return{x:x1,y:y*cp-z1*sp,z:y*sp+z1*cp}});
@@ -595,7 +563,7 @@ function confetti(){
 }
 
 /* ============ LAB TAB ============ */
-const L={seq:[],sel:-1,env:'water',last:null,logs:[],done:{},best:null};
+const L={seq:[],sel:-1,env:'water',last:null,done:{},best:null};
 const ST={on:false,k:1,auto:false,timer:null};
 const F1=new Fold($('cv1'),7);folds.push(F1);
 const pct=v=>v==null?'–':Math.round(v*100)+'%';
@@ -673,12 +641,6 @@ heatBtn.addEventListener('keydown',e=>{if(e.key===' '||e.key==='Enter'){if(!F1.h
 heatBtn.addEventListener('keyup',e=>{if(e.key===' '||e.key==='Enter')heatOff()});
 
 /* analysis */
-function classify(m){
-  if(m.nCt<3||m.nCt===m.len)return'even';
-  const ctE=m.env==='water'?m.expNp:m.expP,otE=m.env==='water'?m.expP:m.expNp;
-  if(ctE==null||otE==null)return'even';
-  if(otE-ctE>.12)return'inside';if(ctE-otE>.12)return'outside';return'even';
-}
 function explain(m){
   const w=m.env==='water',ctn=w?'nonpolar':'polar',otn=w?'polar':'nonpolar';
   const ctE=w?m.expNp:m.expP,otE=w?m.expP:m.expNp,nOt=m.len-m.nCt;
@@ -718,13 +680,11 @@ function completeCh(id){if(L.done[id])return;L.done[id]=true;renderCh();confetti
 F1.onDone=f=>{
   if(f.stepMode){stepSettled();return}
   const m=f.summary();L.last=m;meters();
-  const ex=explain(m),act=classify(m);
+  const ex=explain(m);
   $('resultBody').className='';
   $('resultBody').innerHTML=`<div class="callout ${ex.cls}">${ex.t}</div>
     <p class="small muted" style="margin:8px 0 0">Press <b>Fold it!</b> again to re-run: folding has a random start, so check whether you get the same pattern.</p>`;
   if(f.silent)return;
-  L.logs.push({seq:seqString(L.seq),env:m.env,expNp:m.expNp,expP:m.expP,res:{inside:'Inside',outside:'Outside',even:'Even'}[act],len:m.len});
-  if(L.logs.length>30)L.logs.shift();renderLog();
   for(const c of CH)if(c.id!=='mut'&&c.test(m,L.seq))completeCh(c.id);
   if(m.env==='water'&&m.nNp>=1&&m.minNp<=.1&&(!L.best||m.len<L.best)){L.best=m.len;renderCh()}
 };
@@ -862,7 +822,6 @@ function mCompare(){
     <tr><td>Red-halo beads (oily &amp; stuck outside)</td><td>${a.mism}</td><td>${b.mism}</td></tr></tbody></table>
     <p style="margin:8px 0 0">${diff===0?'The mutant is identical to normal. Flip a chip on the right.':`You changed <b>${diff}</b> amino acid${diff>1?'s':''}. Look at both models: did the core change? Which beads moved?`}</p>
     <p class="small muted" style="margin:8px 0 0">Red-halo beads can stick to other proteins, one reason a small change can have big effects. Try <b>New random start</b> to see how consistent the result is.</p>`;
-  L.logs.push({seq:seqString(M.seqB),env:'water',expNp:b.expNp,expP:b.expP,res:`Mutation lab: ${diff} swap(s), halos ${a.mism}→${b.mism}`,len:b.len});renderLog();
   if(b.mism>a.mism&&diff>0)completeCh('mut');
 }
 function mDone(f){
@@ -925,21 +884,6 @@ $('msAuto').onclick=()=>{
 };
 FA.onDone=mDone;FB.onDone=mDone;
 
-/* ============ WORKSHEET ============ */
-function renderLog(){
-  const tb=document.querySelector('#logTable tbody');
-  tb.innerHTML=L.logs.length?L.logs.map((r,i)=>`<tr><td>${i+1}</td><td class="seqs">${r.seq}</td><td>${r.env==='water'?'Water':'Membrane'}</td><td>${pct(r.expNp)}</td><td>${pct(r.expP)}</td><td>${r.res}</td></tr>`).join('')
-   :'<tr><td colspan="6" class="muted">No experiments yet. Fold a protein!</td></tr>';
-}
-$('stuDate').value=new Date().toLocaleDateString();
-$('printBtn').onclick=()=>{showTab('sheet');setTimeout(()=>print(),50)};
-$('copyBtn').onclick=async()=>{
-  let t=`ProteinFold Lab Worksheet\nName: ${$('stuName').value}  Date: ${$('stuDate').value}\n\n#\tSequence\tWhere\tNonpolar exposed\tPolar exposed\tResult\n`;
-  t+=L.logs.map((r,i)=>[i+1,r.seq,r.env,pct(r.expNp),pct(r.expP),r.res].join('\t')).join('\n');
-  for(let i=1;i<=4;i++)t+=`\n\nQ${i}: ${$('q'+i).value}`;
-  try{await navigator.clipboard.writeText(t);toast('Copied! Paste it into your doc.')}catch(e){toast('Copy blocked. Use Print / Save as PDF instead.')}
-};
-
 /* ============ TABS ============ */
 function showTab(n){
   document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===n));
@@ -949,7 +893,7 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>showTab(b.datas
 
 /* ---------- start ---------- */
 for(const ch of'NPNNPNNPNN')L.seq.push(mk(ch==='N'?'n':'p'));
-F1.setAll(L.seq);renderChips();renderCh();renderLog();mReset();setEnv('water');
+F1.setAll(L.seq);renderChips();renderCh();mReset();setEnv('water');
 $('hudMsg').textContent='Drag to rotate · tap a bead to select';
 requestAnimationFrame(loop);
 window.__PF={F1,FA,FB,L,M};

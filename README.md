@@ -13,7 +13,6 @@ from polar and nonpolar amino acids and watch it fold in 3D.
    denature the protein and watch it refold on cooling.
 2. **Mutation Lab**: compare a normal β-globin fragment with a mutant (sickle-cell swap, or any swap),
    folded all at once or stepped through with Back / Forward as both chains grow together.
-3. **Worksheet**: runs are logged automatically; print/save as PDF or copy as text.
 
 **Step by step** starts empty. **Forward ▶** adds the next amino acid (the new peptide bond flashes and the
 chain folds around it); **◀ Back** removes the last one. Also Auto-play, Restart, and arrow-key control.
