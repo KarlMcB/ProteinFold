@@ -42,9 +42,12 @@ main{padding:16px}
 .hud{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .hud.top{margin-bottom:8px}.hud.bottom{margin-top:8px}
 .hud .pill{background:#fff}
+.hrow{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+[hidden]{display:none!important}
+.callout+.callout{margin-top:6px}
 .pill{background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:.9rem}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:rgba(255,255,255,.92)}
-.seg button{border:0;background:transparent;padding:6px 12px;cursor:pointer;font-weight:600}
+.seg button{border:0;background:transparent;color:var(--ink);padding:6px 12px;cursor:pointer;font-weight:600}
 .seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
 .btn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 14px;cursor:pointer;font-weight:600}
 .btn:hover{border-color:#9db0d3}
@@ -122,7 +125,11 @@ textarea{min-height:76px;resize:vertical}
 <body>
 <header>
   <div class="wrap">
-    <h1>🧬 ProteinFold Lab</h1>
+    <div class="hrow"><h1>🧬 ProteinFold Lab</h1>
+      <div class="seg" role="group" aria-label="Mode">
+        <button id="modePred" aria-pressed="true">🎯 Predict first</button>
+        <button id="modeFree" aria-pressed="false">🎮 Free play</button>
+      </div></div>
     <p>The order of amino acids decides the shape of a protein. Build a chain, then watch it fold.</p>
     <nav role="tablist" aria-label="Sections">
       <button role="tab" aria-selected="true"  data-tab="lab">1 · Build &amp; Fold</button>
@@ -154,9 +161,18 @@ textarea{min-height:76px;resize:vertical}
         <div class="hud bottom">
           <button class="btn go" id="foldBtn">▶ Fold it!</button>
           <button class="btn" id="unfoldBtn">↺ Unfold</button>
+          <button class="btn" id="stepBtn">👣 Step by step</button>
           <button class="btn heat" id="heatBtn" title="Hold to heat the protein" disabled>🔥 Hold to heat</button>
           <span class="spacer"></span>
           <span class="pill small" id="hudMsg">Drag to rotate</span>
+        </div>
+        <div class="hud bottom" id="stepBar" hidden>
+          <span class="pill" id="stepCount"><b>Bond 0 / 0</b></span>
+          <button class="btn" id="stRestart">⏮ Restart</button>
+          <button class="btn" id="stBack">◀ Back</button>
+          <button class="btn go" id="stNext">Next bond ▶</button>
+          <button class="btn" id="stAuto">▶▶ Auto-play</button>
+          <button class="btn" id="stExit">✕ Exit</button>
         </div>
         <div class="meters" aria-live="polite">
           <div class="meter"><span>Nonpolar touching surroundings</span><div class="bar np"><i id="mNp"></i></div><b id="mNpT">–</b></div>
@@ -390,11 +406,12 @@ class Fold{
     this.env='water';this.mode='strand';this.frames=0;this.foldLen=380;this.T0=.14;this.heat=false;
     this.yaw=.6;this.pitch=.3;this.scale=14;this.rand=mulberry32(seed||1);
     this.sel=-1;this.hover=-1;this.labels=false;this.exp=[];this.proj=[];this.tick=0;
-    this.lastTouch=0;this.onDone=null;this.onPick=null;this.silent=false;this.mx=0;this.my=0;
+    this.show=null;this.stepMode=false;this.hiBond=null;this.lastTouch=0;this.onDone=null;this.onPick=null;this.silent=false;this.mx=0;this.my=0;
     this.bubbles=Array.from({length:26},(_,i)=>({x:Math.random(),y:Math.random(),r:3+Math.random()*7,v:.012+Math.random()*.02,h:i%3===0}));
     this.bind();
   }
-  get types(){return this.res.map(r=>r.t)}
+  get n(){return this.show==null?this.res.length:Math.min(this.show,this.res.length)}
+  get types(){return this.res.slice(0,this.n).map(r=>r.t)}
   target(i){const N=this.res.length;return{x:(i-(N-1)/2)*.95,y:i%2?.22:-.22,z:0}}
   setAll(res){
     this.res=res.map(r=>({...r}));this.P=this.res.map((_,i)=>this.target(i));
@@ -426,20 +443,20 @@ class Fold{
     this.heat=on;
   }
   step(){
-    const N=this.res.length;if(!N)return;
+    const NA=this.res.length;if(!NA)return;const N=this.n;
     if(this.mode==='strand'){
-      for(let i=0;i<N;i++){const t=this.target(i),p=this.P[i];p.x+=(t.x-p.x)*.1;p.y+=(t.y-p.y)*.1;p.z+=(t.z-p.z)*.1}
+      for(let i=0;i<NA;i++){const t=this.target(i),p=this.P[i];p.x+=(t.x-p.x)*.1;p.y+=(t.y-p.y)*.1;p.z+=(t.z-p.z)*.1}
     }else{
       let T,att=1;
       if(this.heat){T=.2;att=.12}
       else if(this.mode==='folding'){const t=Math.min(1,this.frames/this.foldLen);T=this.T0*Math.pow(.08,t)+.006;this.frames++}
       else T=.008;
-      simStep(this.P,this.types,this.env,T,att,this.rand);
-      if(this.mode==='folding'&&this.frames>=this.foldLen){this.mode='folded';this.exp=exposures(this.P);if(this.onDone)this.onDone(this)}
+      simStep(this.P.slice(0,N),this.types,this.env,T,att,this.rand);
+      if(this.mode==='folding'&&this.frames>=this.foldLen){this.mode='folded';this.exp=exposures(this.P.slice(0,N));if(this.onDone)this.onDone(this)}
     }
-    if(++this.tick%8===0)this.exp=exposures(this.P);
+    if(++this.tick%8===0)this.exp=exposures(this.P.slice(0,N));
   }
-  summary(){return summarize(this.types,this.exp.length===this.res.length?this.exp:exposures(this.P),this.env)}
+  summary(){return summarize(this.types,this.exp.length===this.n?this.exp:exposures(this.P.slice(0,this.n)),this.env)}
   bind(){
     const cv=this.cv;let drag=false,moved=0,lx=0,ly=0;
     cv.addEventListener('pointerdown',e=>{drag=true;moved=0;lx=e.clientX;ly=e.clientY;cv.setPointerCapture(e.pointerId)});
@@ -466,26 +483,30 @@ class Fold{
     if(cv.width!==Math.round(w*dpr)||cv.height!==Math.round(h*dpr)){cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr)}
     const c=this.cx;c.setTransform(dpr,0,0,dpr,0,0);
     this.background(c,w,h,now);
-    const N=this.res.length;this.proj=[];if(!N){return}
+    const N=this.n;this.proj=[];if(!N){return}
     if(!reduceMotion&&now-this.lastTouch>2500)this.yaw+=.004;
     const cy=Math.cos(this.yaw),sy=Math.sin(this.yaw),cp=Math.cos(this.pitch),sp=Math.sin(this.pitch);
-    let gx=0,gy=0,gz=0;for(const p of this.P){gx+=p.x;gy+=p.y;gz+=p.z}gx/=N;gy/=N;gz/=N;
-    const R=this.P.map(p=>{const x=p.x-gx,y=p.y-gy,z=p.z-gz;const x1=x*cy+z*sy,z1=-x*sy+z*cy;return{x:x1,y:y*cp-z1*sp,z:y*sp+z1*cp}});
+    const PV=this.P.slice(0,N);let gx=0,gy=0,gz=0;for(const p of PV){gx+=p.x;gy+=p.y;gz+=p.z}gx/=N;gy/=N;gz/=N;
+    const R=PV.map(p=>{const x=p.x-gx,y=p.y-gy,z=p.z-gz;const x1=x*cy+z*sy,z1=-x*sy+z*cy;return{x:x1,y:y*cp-z1*sp,z:y*sp+z1*cp}});
     let mX=1,mY=1,mR=1;for(const r of R){mX=Math.max(mX,Math.abs(r.x)+.7);mY=Math.max(mY,Math.abs(r.y)+.7);mR=Math.max(mR,Math.hypot(r.x,r.y,r.z))}
     const tgt=Math.min(w*.46/mX,h*.44/mY,70);this.scale+=(tgt-this.scale)*.08;
     const D=Math.max(18,mR*2.6+8),sc=this.scale;
-    const ct=this.env==='water'?'n':'p',showWarn=this.mode==='folded'&&!this.heat&&this.exp.length===N&&this.res.filter(r=>r.t===ct).length>=3;
+    const ct=this.env==='water'?'n':'p',showWarn=this.mode==='folded'&&!this.heat&&this.exp.length===N&&this.res.slice(0,N).filter(r=>r.t===ct).length>=3;
     const items=[];
     const pr=R.map((r,i)=>{const s=D/(D-r.z);return{x:w/2+r.x*sc*s,y:h*.5-r.y*sc*s,s,z:r.z,i}});
-    for(let i=0;i<N-1;i++)items.push({z:(R[i].z+R[i+1].z)/2-.01,bond:[pr[i],pr[i+1]]});
+    for(let i=0;i<N-1;i++)items.push({z:(R[i].z+R[i+1].z)/2-.01,bond:[pr[i],pr[i+1]],idx:i});
     for(let i=0;i<N;i++)items.push({z:R[i].z,bead:pr[i]});
     items.sort((a,b)=>a.z-b.z);
     const bg=this.env==='water'?'207,234,251':'246,223,174';
     for(const it of items){
-      if(it.bond){const [a,b]=it.bond;c.strokeStyle='#5b6b86';c.lineCap='round';c.lineWidth=Math.max(2,.2*sc*(a.s+b.s)/2);
+      if(it.bond){const [a,b]=it.bond;c.lineCap='round';const bw=Math.max(2,.2*sc*(a.s+b.s)/2);
+        const hb=this.hiBond&&this.hiBond.i===it.idx&&now-this.hiBond.t<4500;
+        if(hb){const pu=.5+.5*Math.sin(now/130);c.save();c.shadowColor='#facc15';c.shadowBlur=14+8*pu;c.strokeStyle='#facc15';c.lineWidth=bw*2.2;
+          c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();c.restore()}
+        c.strokeStyle=hb?'#a16207':'#5b6b86';c.lineWidth=bw;
         c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();continue}
       const q=it.bead,i=q.i,res=this.res[i];
-      const age=(now-this.born[i])/380;let k=1;if(age<1){const t=Math.max(0,age)-1;k=1+2.7*t*t*t+1.7*t*t}
+      const age=(now-this.born[i])/380;let k=1;if(age<1){const t=Math.max(0,age)-1;k=Math.max(0,1+2.7*t*t*t+1.7*t*t)}
       const r=.5*sc*q.s*k;this.proj.push({x:q.x,y:q.y,r,z:q.z,i});
       const col=COL[res.t];
       if(showWarn&&res.t===ct&&this.exp[i]>MISMATCH){
@@ -502,6 +523,11 @@ class Fold{
       if(i===this.sel||i===this.hover){c.strokeStyle=i===this.sel?'#14213d':'#7c3aed';c.lineWidth=3;c.beginPath();c.arc(q.x,q.y,r+3,0,7);c.stroke();
         if(i===this.sel){c.strokeStyle='#fff';c.lineWidth=1.5;c.beginPath();c.arc(q.x,q.y,r+5.5,0,7);c.stroke()}}
     }
+    if(this.hiBond&&now-this.hiBond.t<3500&&this.hiBond.i+1<N){
+      const a=pr[this.hiBond.i],b=pr[this.hiBond.i+1],mx=(a.x+b.x)/2,my=(a.y+b.y)/2,fade=Math.min(1,(3500-(now-this.hiBond.t))/700);
+      c.globalAlpha=fade;c.font='700 13px system-ui,sans-serif';const tw=c.measureText('peptide bond').width+16;
+      c.fillStyle='#facc15';c.beginPath();c.roundRect?c.roundRect(mx-tw/2,my-34,tw,24,8):c.rect(mx-tw/2,my-34,tw,24);c.fill();
+      c.fillStyle='#422006';c.textAlign='center';c.textBaseline='middle';c.fillText('peptide bond',mx,my-22);c.globalAlpha=1}
     const ti=this.hover>=0?this.hover:this.sel;
     if(ti>=0&&ti<N){const q=this.proj.find(p=>p.i===ti);if(q)this.tooltip(c,q,w);}
   }
@@ -543,7 +569,7 @@ const folds=[];let active='lab';
 function loop(now){
   for(const f of folds){
     if(!f.cv.offsetParent)continue;
-    f.step();f.step();f.render(now);
+    try{f.step();f.step();f.render(now)}catch(e){if(!f.err){f.err=1;console.error(e&&e.stack||e)}}
   }
   requestAnimationFrame(loop);
 }
@@ -562,6 +588,7 @@ function confetti(){
 
 /* ============ LAB TAB ============ */
 const L={seq:[],sel:-1,env:'water',quiz:true,pred:null,last:null,logs:[],done:{},best:null};
+const ST={on:false,k:1,auto:false,timer:null};
 const F1=new Fold($('cv1'),7);folds.push(F1);
 const pct=v=>v==null?'–':Math.round(v*100)+'%';
 
@@ -580,6 +607,7 @@ $('chips').addEventListener('mouseleave',()=>{F1.hover=-1});
 F1.onPick=i=>{if(i<0){if(L.sel>=0){L.sel=-1;renderChips()}}else{L.sel=i;renderChips()}};
 
 function add(t){
+  exitStep();
   if(L.seq.length>=24){toast('Max 24 amino acids in this lab');return}
   const r=mk(t),at=L.sel>=0?L.sel+1:L.seq.length;
   L.seq.splice(at,0,r);F1.insert(at,r);if(L.sel>=0)L.sel=at;resetResult();renderChips();
@@ -587,19 +615,19 @@ function add(t){
   if($('growToggle').checked&&F1.mode==='strand'&&L.seq.length>=4){F1.begin(.1,300,false)}
 }
 $('addNp').onclick=()=>add('n');$('addP').onclick=()=>add('p');
-$('flipBtn').onclick=()=>{if(L.sel<0)return;const r=mk(L.seq[L.sel].t==='n'?'p':'n');L.seq[L.sel]=r;F1.retype(L.sel,r);resetResult();renderChips()};
-$('delBtn').onclick=()=>{if(L.sel<0)return;L.seq.splice(L.sel,1);F1.remove(L.sel);L.sel=Math.min(L.sel,L.seq.length-1);resetResult();renderChips()};
-function move(d){const i=L.sel,j=i+d;if(i<0||j<0||j>=L.seq.length)return;
+$('flipBtn').onclick=()=>{if(L.sel<0)return;exitStep();const r=mk(L.seq[L.sel].t==='n'?'p':'n');L.seq[L.sel]=r;F1.retype(L.sel,r);resetResult();renderChips()};
+$('delBtn').onclick=()=>{if(L.sel<0)return;exitStep();L.seq.splice(L.sel,1);F1.remove(L.sel);L.sel=Math.min(L.sel,L.seq.length-1);resetResult();renderChips()};
+function move(d){const i=L.sel,j=i+d;if(i<0||j<0||j>=L.seq.length)return;exitStep();
   [L.seq[i],L.seq[j]]=[L.seq[j],L.seq[i]];F1.swap(i,j);L.sel=j;resetResult();renderChips()}
 $('leftBtn').onclick=()=>move(-1);$('rightBtn').onclick=()=>move(1);
-$('clearBtn').onclick=()=>{L.seq=[];L.sel=-1;F1.setAll([]);resetResult();renderChips()};
+$('clearBtn').onclick=()=>{exitStep();L.seq=[];L.sel=-1;F1.setAll([]);resetResult();renderChips()};
 $('lblToggle').onchange=e=>{F1.labels=e.target.checked};
 
 const PRESETS={
   alt:'NPNPNPNPNPNPNP',block:'NNNNNNNNPPPPPPPP',shell:'NNPNNPNNPNNPNNPN',
   polar:'PPNPPPPNPPPPNPPP',oily:'NNNPNNNNPNNNNPNN'};
 $('preset').onchange=e=>{
-  const v=e.target.value;if(!v)return;
+  const v=e.target.value;if(!v)return;exitStep();
   const s=v==='rand'?Array.from({length:14},()=>Math.random()<.5?'N':'P').join(''):PRESETS[v];
   L.seq=[...s].map(ch=>mk(ch==='N'?'n':'p'));L.sel=-1;F1.setAll(L.seq);resetResult();renderChips();
   hint('Predict the shape, then press Fold it!');e.target.value='';
@@ -625,6 +653,7 @@ function resetResult(){
 /* prediction → fold */
 function ctName(env){return env==='water'?'orange (nonpolar)':'blue (polar)'}
 function pressFold(){
+  if(ST.on)exitStep();
   if(L.seq.length<4){hint('Add at least 4 amino acids first');return}
   if(F1.mode==='strand'){
     if(L.quiz){
@@ -646,7 +675,7 @@ function startFold(pred){
   $('resultBody').className='muted';$('resultBody').innerHTML='Folding… watch where the beads go. 👀';
 }
 $('foldBtn').onclick=pressFold;
-$('unfoldBtn').onclick=()=>{F1.unfold();resetResult();$('heatBtn').disabled=true;$('hudMsg').textContent='Unfolded: nothing is pulling it together yet'};
+$('unfoldBtn').onclick=()=>{exitStep();F1.unfold();resetResult();$('heatBtn').disabled=true;$('hudMsg').textContent='Unfolded: nothing is pulling it together yet'};
 const heatBtn=$('heatBtn');
 const heatOn=e=>{e.preventDefault();F1.setHeat(true);$('hudMsg').textContent='🔥 Heating… the protein is denaturing'};
 const heatOff=()=>{if(!F1.heat)return;F1.setHeat(false);$('hudMsg').textContent='Cooling… will it fold back the same way?'};
@@ -675,13 +704,13 @@ function explain(m){
 }
 
 function meters(){
-  const n=F1.res.length,e=F1.exp;
+  const n=F1.n,e=F1.exp;
   if(!n||e.length!==n){$('mNp').style.width=$('mP').style.width='0';$('mNpT').textContent=$('mPT').textContent='–';return}
   const s=summarize(F1.types,e,F1.env);
   $('mNp').style.width=(s.expNp==null?0:s.expNp*100)+'%';$('mP').style.width=(s.expP==null?0:s.expP*100)+'%';
   $('mNpT').textContent=pct(s.expNp);$('mPT').textContent=pct(s.expP);
 }
-setInterval(()=>{meters();$('heatBtn').disabled=F1.mode==='strand'||L.seq.length<4},200);
+setInterval(()=>{meters();$('heatBtn').disabled=F1.mode==='strand'||L.seq.length<4||ST.on},200);
 
 const CH=[
  {id:'hide',t:'Hide the oily parts',d:'In water, build 14+ amino acids with at least 6 nonpolar, so the nonpolar beads average 25% exposed or less.',test:m=>m.env==='water'&&m.len>=14&&m.nNp>=6&&m.expNp<=.25},
@@ -698,6 +727,7 @@ function renderCh(){
 function completeCh(id){if(L.done[id])return;L.done[id]=true;renderCh();confetti();toast('🏆 Challenge complete: '+CH.find(c=>c.id===id).t)}
 
 F1.onDone=f=>{
+  if(f.stepMode){stepSettled();return}
   const m=f.summary();L.last=m;meters();
   const ex=explain(m),act=classify(m);let pr='';
   if(L.pred){const ok=L.pred===act,lab={inside:'inside',outside:'outside',even:'spread evenly'};
@@ -711,6 +741,83 @@ F1.onDone=f=>{
   for(const c of CH)if(c.id!=='mut'&&c.test(m,L.seq))completeCh(c.id);
   if(m.env==='water'&&m.nNp>=1&&m.minNp<=.1&&(!L.best||m.len<L.best)){L.best=m.len;renderCh()}
   L.pred=null;
+};
+
+/* ---------- free play ---------- */
+function setQuiz(q){
+  L.quiz=q;$('modePred').setAttribute('aria-pressed',q);$('modeFree').setAttribute('aria-pressed',!q);
+  toast(q?'Predict first: you will guess before each fold':'Free play: no prediction questions');
+  if(!q&&F1.mode==='strand'&&$('resultBody').querySelector('[data-pred]'))startFold(null);
+  if(!q&&FA.mode==='strand'&&$('mBody').querySelector('[data-mp]'))mStart(null);
+}
+$('modePred').onclick=()=>setQuiz(true);$('modeFree').onclick=()=>setQuiz(false);
+
+/* ---------- step by step, bond by bond ---------- */
+function enterStep(){
+  if(ST.on){exitStep();return}
+  if(L.seq.length<2){hint('Add at least 2 amino acids first');return}
+  ST.on=true;ST.auto=false;F1.stepMode=true;F1.heat=false;$('stepBar').hidden=false;$('stepBtn').setAttribute('aria-pressed','true');
+  stepReset();
+}
+function exitStep(){
+  if(!ST.on)return;
+  clearTimeout(ST.timer);ST.on=false;ST.auto=false;F1.stepMode=false;F1.show=null;F1.hiBond=null;F1.mode='strand';F1.exp=[];
+  $('stepBar').hidden=true;$('stepBtn').setAttribute('aria-pressed','false');
+  dimChips();
+  resetResult();hint('Press Fold it! to fold the whole chain');
+}
+function stepReset(){
+  clearTimeout(ST.timer);ST.k=1;ST.auto=false;
+  F1.P=F1.res.map((_,i)=>F1.target(i));F1.show=1;F1.mode='folded';F1.hiBond=null;F1.exp=[];F1.sel=-1;L.sel=-1;renderChips();
+  F1.born[0]=performance.now();stepNarrate();stepUI();
+}
+function stepGo(k){
+  const N=L.seq.length;k=Math.max(1,Math.min(N,k));if(k===ST.k)return;
+  clearTimeout(ST.timer);const now=performance.now();
+  if(k>ST.k){
+    const i=k-1,P=F1.P,prev=P[i-1];let cx=0,cy=0,cz=0;
+    for(let j=0;j<i;j++){cx+=P[j].x;cy+=P[j].y;cz+=P[j].z}cx/=i;cy/=i;cz/=i;
+    let dx=prev.x-cx,dy=prev.y-cy,dz=prev.z-cz,d=Math.hypot(dx,dy,dz);
+    if(d<.2){dx=1;dy=.2;dz=.1;d=Math.hypot(dx,dy,dz)}
+    const j=()=>(Math.random()-.5)*.3;
+    P[i]={x:prev.x+dx/d+j(),y:prev.y+dy/d+j(),z:prev.z+dz/d+j()};
+    F1.born[i]=now;F1.hiBond={i:i-1,t:now};F1.show=k;F1.begin(.06,160,true);
+  }else{F1.show=k;F1.hiBond=null;F1.begin(.04,140,true)}
+  ST.k=k;stepNarrate();stepUI();
+}
+function stepNarrate(extra=''){
+  const N=L.seq.length,k=ST.k,ty=r=>r.t==='n'?'nonpolar':'polar';let h;
+  if(k===1)h=`<b>Start:</b> the first amino acid is <b>${L.seq[0].name}</b> (${ty(L.seq[0])}). Press <b>Next bond ▶</b> to add the next one.`;
+  else{const a=L.seq[k-2],b=L.seq[k-1];
+    h=`<b>Bond ${k-1} of ${N-1}:</b> ${a.abbr} ⟶ ${b.abbr}<br>A <b>peptide bond</b> forms (dehydration synthesis releases one water) and <b>${b.name}</b> (${ty(b)}) joins the chain.`}
+  if(k===N)h+=`<br><b>Chain complete!</b> Press <b>Restart</b> to watch again, or <b>Exit</b> to edit the sequence.`;
+  $('resultBody').className='';$('resultBody').innerHTML=`<div class="callout info">${h}</div>${extra}`;
+}
+function stepUI(){
+  const N=L.seq.length;
+  $('stepCount').innerHTML=`<b>Bond ${ST.k-1} / ${N-1}</b>`;
+  $('stBack').disabled=ST.k<=1;$('stNext').disabled=ST.k>=N;
+  $('stAuto').textContent=ST.auto?'⏸ Pause':'▶▶ Auto-play';
+  dimChips();
+}
+function dimChips(){document.querySelectorAll('#chips .chip').forEach((c,i)=>{c.style.opacity=ST.on&&i>=ST.k?.3:''})}
+function stepSettled(){
+  const N=L.seq.length,m=F1.summary(),w=m.env==='water',ctn=w?'nonpolar':'polar',otn=w?'polar':'nonpolar';
+  const ctE=w?m.expNp:m.expP,otE=w?m.expP:m.expNp;let t;
+  if(m.nCt<3)t=`So far only <b>${m.nCt}</b> ${ctn} bead${m.nCt===1?'':'s'}: not enough to pull together into a core yet.`;
+  else t=`The ${ctn} beads are <b>${pct(ctE)}</b> exposed${otE!=null?` (${otn}: ${pct(otE)})`:''}. ${ctE<.4?'A core is forming!':'Still loose; more beads may help.'}`;
+  stepNarrate(`<div class="callout">${t}</div>`);
+  if(ST.auto){if(ST.k<N)ST.timer=setTimeout(()=>stepGo(ST.k+1),800);else{ST.auto=false;stepUI()}}
+}
+$('stepBtn').onclick=enterStep;
+$('stNext').onclick=()=>stepGo(ST.k+1);
+$('stBack').onclick=()=>{ST.auto=false;stepGo(ST.k-1)};
+$('stRestart').onclick=stepReset;
+$('stExit').onclick=exitStep;
+$('stAuto').onclick=()=>{
+  if(ST.auto){ST.auto=false;clearTimeout(ST.timer);stepUI();return}
+  if(ST.k>=L.seq.length)stepReset();
+  ST.auto=true;stepUI();if(F1.mode==='folded')ST.timer=setTimeout(()=>stepGo(ST.k+1),500);
 };
 
 /* ============ MUTATION LAB ============ */
@@ -736,7 +843,7 @@ $('chipsB').addEventListener('click',e=>{
   if(FB.mode==='strand'&&FA.mode==='strand')mIntro();
 });
 $('mFold').onclick=()=>{
-  if(FA.mode==='strand'){
+  if(FA.mode==='strand'&&L.quiz){
     $('mBody').className='';
     $('mBody').innerHTML=`<b>Predict:</b> compared with the normal protein, how many <span style="color:var(--bad)"><b>red-halo</b></span> beads (oily beads stuck on the outside) will the mutant have?
       <div class="opts"><button class="btn" data-mp="more">More</button><button class="btn" data-mp="same">About the same</button><button class="btn" data-mp="fewer">Fewer</button><button class="btn small" data-mp="skip">Skip</button></div>`;

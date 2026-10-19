@@ -14,6 +14,10 @@ from polar and nonpolar amino acids and watch it fold in 3D.
 2. **Mutation Lab**: compare a normal β-globin fragment with a mutant (sickle-cell swap, or any swap).
 3. **Worksheet**: runs and predictions are logged automatically; print/save as PDF or copy as text.
 
+**Free play** (header switch) turns off all prediction questions in both tabs.
+**Step by step** adds one amino acid at a time: each new peptide bond flashes and the partial chain
+folds, with Back / Next / Auto-play controls and a short explanation per bond.
+
 Six challenges (hide the oily parts, fully buried, inside-out membrane protein, sticky patch,
 zipper test, sticky-swap detective) give students goals.
 
