@@ -36,7 +36,7 @@ main{padding:16px}
 
 /* stage */
 .stage{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#cfeafb}
-.stage canvas{display:block;width:100%;height:440px;touch-action:none;cursor:grab}
+.stage canvas{display:block;width:100%;height:clamp(300px,52vh,440px);touch-action:none;cursor:grab}
 .stage canvas:active{cursor:grabbing}
 @media(max-width:700px){.stage canvas{height:340px}}
 .hud{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -158,7 +158,7 @@ textarea{min-height:76px;resize:vertical}
           <canvas id="cv1" aria-label="3D model of the protein chain. Drag to rotate."></canvas>
           <div class="hint" id="hint1"></div>
         </div>
-        <div class="hud bottom">
+        <div class="hud bottom" id="mainBar">
           <button class="btn go" id="foldBtn">▶ Fold it!</button>
           <button class="btn" id="unfoldBtn">↺ Unfold</button>
           <button class="btn" id="stepBtn">👣 Step by step</button>
@@ -167,12 +167,12 @@ textarea{min-height:76px;resize:vertical}
           <span class="pill small" id="hudMsg">Drag to rotate</span>
         </div>
         <div class="hud bottom" id="stepBar" hidden>
-          <span class="pill" id="stepCount"><b>Bond 0 / 0</b></span>
-          <button class="btn" id="stRestart">⏮ Restart</button>
+          <button class="btn go" id="stNext">➕ Add next amino acid</button>
           <button class="btn" id="stBack">◀ Back</button>
-          <button class="btn go" id="stNext">Next bond ▶</button>
           <button class="btn" id="stAuto">▶▶ Auto-play</button>
+          <button class="btn" id="stRestart">⏮ Restart</button>
           <button class="btn" id="stExit">✕ Exit</button>
+          <span class="pill" id="stepCount"><b>Amino acid 1 / 1</b></span>
         </div>
         <div class="meters" aria-live="polite">
           <div class="meter"><span>Nonpolar touching surroundings</span><div class="bar np"><i id="mNp"></i></div><b id="mNpT">–</b></div>
@@ -452,6 +452,7 @@ class Fold{
       else if(this.mode==='folding'){const t=Math.min(1,this.frames/this.foldLen);T=this.T0*Math.pow(.08,t)+.006;this.frames++}
       else T=.008;
       simStep(this.P.slice(0,N),this.types,this.env,T,att,this.rand);
+      if(this.P.slice(0,N).some(q=>!isFinite(q.x+q.y+q.z)))for(let i=0;i<N;i++)this.P[i]=this.target(i);
       if(this.mode==='folding'&&this.frames>=this.foldLen){this.mode='folded';this.exp=exposures(this.P.slice(0,N));if(this.onDone)this.onDone(this)}
     }
     if(++this.tick%8===0)this.exp=exposures(this.P.slice(0,N));
@@ -507,7 +508,7 @@ class Fold{
         c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();continue}
       const q=it.bead,i=q.i,res=this.res[i];
       const age=(now-this.born[i])/380;let k=1;if(age<1){const t=Math.max(0,age)-1;k=Math.max(0,1+2.7*t*t*t+1.7*t*t)}
-      const r=.5*sc*q.s*k;this.proj.push({x:q.x,y:q.y,r,z:q.z,i});
+      const r=.5*sc*q.s*k;if(!(r>=0.01)||!isFinite(q.x+q.y)){continue}this.proj.push({x:q.x,y:q.y,r,z:q.z,i});
       const col=COL[res.t];
       if(showWarn&&res.t===ct&&this.exp[i]>MISMATCH){
         const pulse=.5+.5*Math.sin(now/220);c.strokeStyle=`rgba(225,29,72,${.55+.4*pulse})`;c.lineWidth=3;
@@ -756,13 +757,13 @@ $('modePred').onclick=()=>setQuiz(true);$('modeFree').onclick=()=>setQuiz(false)
 function enterStep(){
   if(ST.on){exitStep();return}
   if(L.seq.length<2){hint('Add at least 2 amino acids first');return}
-  ST.on=true;ST.auto=false;F1.stepMode=true;F1.heat=false;$('stepBar').hidden=false;$('stepBtn').setAttribute('aria-pressed','true');
-  stepReset();
+  ST.on=true;ST.auto=false;F1.stepMode=true;F1.heat=false;$('stepBar').hidden=false;$('mainBar').hidden=true;
+  stepReset();hint('Press ➕ Add next amino acid. Each one bonds on, then the chain folds.');
 }
 function exitStep(){
   if(!ST.on)return;
   clearTimeout(ST.timer);ST.on=false;ST.auto=false;F1.stepMode=false;F1.show=null;F1.hiBond=null;F1.mode='strand';F1.exp=[];
-  $('stepBar').hidden=true;$('stepBtn').setAttribute('aria-pressed','false');
+  $('stepBar').hidden=true;$('mainBar').hidden=false;
   dimChips();
   resetResult();hint('Press Fold it! to fold the whole chain');
 }
@@ -787,16 +788,17 @@ function stepGo(k){
 }
 function stepNarrate(extra=''){
   const N=L.seq.length,k=ST.k,ty=r=>r.t==='n'?'nonpolar':'polar';let h;
-  if(k===1)h=`<b>Start:</b> the first amino acid is <b>${L.seq[0].name}</b> (${ty(L.seq[0])}). Press <b>Next bond ▶</b> to add the next one.`;
+  if(k===1)h=`<b>Amino acid 1:</b> <b>${L.seq[0].name}</b> (${ty(L.seq[0])}). Press <b>➕ Add next amino acid</b> to bond the next one on.`;
   else{const a=L.seq[k-2],b=L.seq[k-1];
-    h=`<b>Bond ${k-1} of ${N-1}:</b> ${a.abbr} ⟶ ${b.abbr}<br>A <b>peptide bond</b> forms (dehydration synthesis releases one water) and <b>${b.name}</b> (${ty(b)}) joins the chain.`}
+    h=`<b>Amino acid ${k} of ${N}</b> joins: ${a.abbr} ⟶ ${b.abbr}<br>A <b>peptide bond</b> forms (dehydration synthesis releases one water) and <b>${b.name}</b> (${ty(b)}) joins the chain.`}
   if(k===N)h+=`<br><b>Chain complete!</b> Press <b>Restart</b> to watch again, or <b>Exit</b> to edit the sequence.`;
   $('resultBody').className='';$('resultBody').innerHTML=`<div class="callout info">${h}</div>${extra}`;
 }
 function stepUI(){
   const N=L.seq.length;
-  $('stepCount').innerHTML=`<b>Bond ${ST.k-1} / ${N-1}</b>`;
+  $('stepCount').innerHTML=`<b>Amino acid ${ST.k} / ${N}</b>`;
   $('stBack').disabled=ST.k<=1;$('stNext').disabled=ST.k>=N;
+  $('stNext').textContent=ST.k>=N?'✔ Chain complete':`➕ Add amino acid ${ST.k+1} (${L.seq[ST.k].abbr})`;
   $('stAuto').textContent=ST.auto?'⏸ Pause':'▶▶ Auto-play';
   dimChips();
 }
@@ -810,6 +812,11 @@ function stepSettled(){
   if(ST.auto){if(ST.k<N)ST.timer=setTimeout(()=>stepGo(ST.k+1),800);else{ST.auto=false;stepUI()}}
 }
 $('stepBtn').onclick=enterStep;
+addEventListener('keydown',e=>{
+  if(!ST.on||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.key==='ArrowRight'){e.preventDefault();stepGo(ST.k+1)}
+  if(e.key==='ArrowLeft'){e.preventDefault();ST.auto=false;stepGo(ST.k-1)}
+});
 $('stNext').onclick=()=>stepGo(ST.k+1);
 $('stBack').onclick=()=>{ST.auto=false;stepGo(ST.k-1)};
 $('stRestart').onclick=stepReset;
