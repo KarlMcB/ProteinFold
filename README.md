@@ -43,3 +43,4 @@ so it can be unit-tested in Node.
 
 ### 30-minute, black-and-white versions
 `ProteinFold_Student_Worksheet_30min_BW.docx` and `ProteinFold_Answer_Key_30min_BW.docx`: 2 pages each, grayscale design for B&W printing (dark/light grays, heavy borders, grayscale screenshots). Cuts from the full version: fewer table rows, one mutation run, no four-protein table, challenge checklist or bonus.
+`ProteinFold_Student_QuickStart_BW.docx`: a one-page, black-and-white quick-start guide (labeled screenshots of Tab 1 and Tab 3, Tab 2 summary, and troubleshooting) meant for the back of the worksheet.
