@@ -26,6 +26,7 @@ nav button:focus-visible,button:focus-visible,select:focus-visible,textarea:focu
 main{padding:16px}
 .tab{display:none}.tab.on{display:block}
 .lab{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(300px,1fr);gap:16px;align-items:start}
+@media(min-width:901px){.lab>div:nth-child(2){position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto;padding:2px}}
 @media(max-width:900px){.lab{grid-template-columns:1fr}.lab>div{display:contents}.lab .card{margin-top:0}#stageCard{order:1}#resultCard{order:2}#buildCard{order:3}#chCard{order:4}#whyCard{order:5}}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 1px 2px rgba(20,33,61,.05)}
 .card+.card{margin-top:16px}
@@ -444,6 +445,7 @@ class Fold{
   }
   step(){
     const NA=this.res.length;if(!NA)return;const N=this.n;
+    if(!N&&this.mode!=='strand')return;
     if(this.mode==='strand'){
       for(let i=0;i<NA;i++){const t=this.target(i),p=this.P[i];p.x+=(t.x-p.x)*.1;p.y+=(t.y-p.y)*.1;p.z+=(t.z-p.z)*.1}
     }else{
@@ -758,7 +760,7 @@ function enterStep(){
   if(ST.on){exitStep();return}
   if(L.seq.length<2){hint('Add at least 2 amino acids first');return}
   ST.on=true;ST.auto=false;F1.stepMode=true;F1.heat=false;$('stepBar').hidden=false;$('mainBar').hidden=true;
-  stepReset();hint('Press Forward ▶. Each amino acid bonds on, then the chain folds.');
+  stepReset();hint('Press Forward ▶ to add the first amino acid.');
 }
 function exitStep(){
   if(!ST.on)return;
@@ -768,27 +770,35 @@ function exitStep(){
   resetResult();hint('Press Fold it! to fold the whole chain');
 }
 function stepReset(){
-  clearTimeout(ST.timer);ST.k=1;ST.auto=false;
-  F1.P=F1.res.map((_,i)=>F1.target(i));F1.show=1;F1.mode='folded';F1.hiBond=null;F1.exp=[];F1.sel=-1;L.sel=-1;renderChips();
-  F1.born[0]=performance.now();stepNarrate();stepUI();
+  clearTimeout(ST.timer);ST.k=0;ST.auto=false;
+  F1.P=F1.res.map((_,i)=>F1.target(i));F1.show=0;F1.mode='folded';F1.hiBond=null;F1.exp=[];F1.sel=-1;L.sel=-1;renderChips();
+  stepNarrate();stepUI();
 }
 function stepGo(k){
-  const N=L.seq.length;k=Math.max(1,Math.min(N,k));if(k===ST.k)return;
+  const N=L.seq.length;k=Math.max(0,Math.min(N,k));if(k===ST.k)return;
   clearTimeout(ST.timer);const now=performance.now();
-  if(k>ST.k){
-    const i=k-1,P=F1.P,prev=P[i-1];let cx=0,cy=0,cz=0;
-    for(let j=0;j<i;j++){cx+=P[j].x;cy+=P[j].y;cz+=P[j].z}cx/=i;cy/=i;cz/=i;
-    let dx=prev.x-cx,dy=prev.y-cy,dz=prev.z-cz,d=Math.hypot(dx,dy,dz);
-    if(d<.2){dx=1;dy=.2;dz=.1;d=Math.hypot(dx,dy,dz)}
-    const j=()=>(Math.random()-.5)*.3;
-    P[i]={x:prev.x+dx/d+j(),y:prev.y+dy/d+j(),z:prev.z+dz/d+j()};
-    F1.born[i]=now;F1.hiBond={i:i-1,t:now};F1.show=k;F1.begin(.06,160,true);
-  }else{F1.show=k;F1.hiBond=null;F1.begin(.04,140,true)}
+  if(k>ST.k){                       // Forward: bond the next amino acid on
+    const i=k-1,P=F1.P;
+    if(i===0)P[0]={x:0,y:0,z:0};
+    else{
+      const prev=P[i-1];let cx=0,cy=0,cz=0;
+      for(let j=0;j<i;j++){cx+=P[j].x;cy+=P[j].y;cz+=P[j].z}cx/=i;cy/=i;cz/=i;
+      let dx=prev.x-cx,dy=prev.y-cy,dz=prev.z-cz,d=Math.hypot(dx,dy,dz);
+      if(d<.2){dx=1;dy=.2;dz=.1;d=Math.hypot(dx,dy,dz)}
+      const j=()=>(Math.random()-.5)*.3;
+      P[i]={x:prev.x+dx/d+j(),y:prev.y+dy/d+j(),z:prev.z+dz/d+j()};
+    }
+    F1.born[i]=now;F1.hiBond=i>0?{i:i-1,t:now}:null;F1.show=k;F1.begin(i>0?.06:.02,i>0?160:40,true);
+  }else{                            // Back: remove the last amino acid
+    F1.show=k;F1.hiBond=null;F1.exp=[];
+    if(k>0)F1.begin(.04,140,true);else F1.mode='folded';
+  }
   ST.k=k;stepNarrate();stepUI();
 }
 function stepNarrate(extra=''){
   const N=L.seq.length,k=ST.k,ty=r=>r.t==='n'?'nonpolar':'polar';let h;
-  if(k===1)h=`<b>Amino acid 1:</b> <b>${L.seq[0].name}</b> (${ty(L.seq[0])}). Press <b>Forward ▶</b> to bond the next one on.`;
+  if(k===0)h=`<b>Empty chain.</b> Press <b>Forward ▶</b> to add the first amino acid: <b>${L.seq[0].name}</b> (${ty(L.seq[0])}). <b>◀ Back</b> removes the last one you added.`;
+  else if(k===1)h=`<b>Amino acid 1:</b> <b>${L.seq[0].name}</b> (${ty(L.seq[0])}). Press <b>Forward ▶</b> to bond the next one on.`;
   else{const a=L.seq[k-2],b=L.seq[k-1];
     h=`<b>Amino acid ${k} of ${N}</b> joins: ${a.abbr} ⟶ ${b.abbr}<br>A <b>peptide bond</b> forms (dehydration synthesis releases one water) and <b>${b.name}</b> (${ty(b)}) joins the chain.`}
   if(k===N)h+=`<br><b>Chain complete!</b> Press <b>Restart</b> to watch again, or <b>Exit</b> to edit the sequence.`;
@@ -797,7 +807,7 @@ function stepNarrate(extra=''){
 function stepUI(){
   const N=L.seq.length;
   $('stepCount').innerHTML=`<b>Amino acid ${ST.k} / ${N}</b>`;
-  $('stBack').disabled=ST.k<=1;$('stNext').disabled=ST.k>=N;
+  $('stBack').disabled=ST.k<=0;$('stNext').disabled=ST.k>=N;
   $('stNext').textContent=ST.k>=N?'✔ Complete':`Forward ▶ +${L.seq[ST.k].abbr}`;
   $('stNext').title=ST.k>=N?'All amino acids added':`Add amino acid ${ST.k+1}: ${L.seq[ST.k].name}`;
   $('stAuto').textContent=ST.auto?'⏸ Pause':'▶▶ Auto-play';

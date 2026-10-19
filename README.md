@@ -15,8 +15,8 @@ from polar and nonpolar amino acids and watch it fold in 3D.
 3. **Worksheet**: runs and predictions are logged automatically; print/save as PDF or copy as text.
 
 **Free play** (header switch) turns off all prediction questions in both tabs.
-**Step by step** adds one amino acid at a time: each new peptide bond flashes and the partial chain
-folds, with Back / Next / Auto-play controls and a short explanation per bond.
+**Step by step** starts empty. **Forward ▶** adds the next amino acid (the new peptide bond flashes and the
+chain folds around it); **◀ Back** removes the last one. Also Auto-play, Restart, and arrow-key control.
 
 Six challenges (hide the oily parts, fully buried, inside-out membrane protein, sticky patch,
 zipper test, sticky-swap detective) give students goals.
